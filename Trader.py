@@ -2,6 +2,8 @@ from datamodel import OrderDepth, UserId, TradingState, Order
 from typing import List
 import string
 
+
+
 class Trader:
     
     def run(self, state: TradingState):
@@ -10,29 +12,38 @@ class Trader:
 
 				# Orders to be placed on exchange matching engine
         result = {}
-        buy_moves = 10
-        sell_moves = 10
         for product in state.order_depths:
-
             order_depth: OrderDepth = state.order_depths[product]
             orders: List[Order] = []
             acceptable_price = 10000  # Participant should calculate this value
             print("Acceptable price : " + str(acceptable_price))
             print("Buy Order depth : " + str(len(order_depth.buy_orders)) + ", Sell order depth : " + str(len(order_depth.sell_orders)))
 
+            buy_moves = 0
+            sell_moves = 0
             if len(order_depth.sell_orders) != 0:
-                best_ask, best_ask_amount = list(order_depth.sell_orders.items())[0]
-                if int(best_ask) < acceptable_price and buy_moves >= 0:
-                    print("BUY", str(-best_ask_amount) + "x", best_ask)
-                    buy_moves -= 1
-                    orders.append(Order(product, best_ask, -best_ask_amount))
-    
+                i = 0
+                while(buy_moves <= 10 and i < len(order_depth.sell_orders)):
+                  best_ask, best_ask_amount = list(order_depth.sell_orders.items())[i]
+                  # best_ask_amount is negative
+                  if -best_ask_amount < 0:  # debug
+                    exit(1)
+                  if int(best_ask) < acceptable_price:
+                      print("BUY", str(-best_ask_amount) + "x", best_ask)
+                      buy_moves += -best_ask_amount
+                      orders.append(Order(product, best_ask, -best_ask_amount))
+                  i += 1
+
             if len(order_depth.buy_orders) != 0:
-                best_bid, best_bid_amount = list(order_depth.buy_orders.items())[0]
-                if int(best_bid) > acceptable_price and sell_moves >= 0:
-                    print("SELL", str(best_bid_amount) + "x", best_bid)
-                    sell_moves -= 1
-                    orders.append(Order(product, best_bid, -best_bid_amount))
+                i = 0
+                while(sell_moves <= 10 and i < len(order_depth.buy_orders)):
+                  best_bid, best_bid_amount = list(order_depth.buy_orders.items())[i]
+                  # best_bid_amount is postive
+                  if int(best_bid) > acceptable_price:
+                      print("SELL", str(best_bid_amount) + "x", best_bid)
+                      sell_moves += best_bid_amount
+                      orders.append(Order(product, best_bid, -best_bid_amount))
+                  i += 1
             
             result[product] = orders
     
@@ -42,4 +53,5 @@ class Trader:
         
 				# Sample conversion request. Check more details below. 
         conversions = 0
+        # logger.flush(state, result, conversions, traderData)
         return result, conversions, traderData

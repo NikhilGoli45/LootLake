@@ -19,8 +19,8 @@ class Trader:
             print("Acceptable price : " + str(acceptable_price))
             print("Buy Order depth : " + str(len(order_depth.buy_orders)) + ", Sell order depth : " + str(len(order_depth.sell_orders)))
 
-            MAX_BUY_MOVES = 10
-            MAX_SELL_MOVES = 10
+            MAX_BUY_MOVES = 20  # decreasing this will decrease profit. means this is not doing anything, our model is too simple
+            MAX_SELL_MOVES = 20
             buy_moves = 0
             sell_moves = 0
             if len(order_depth.sell_orders) != 0:
@@ -28,8 +28,6 @@ class Trader:
                 while(buy_moves <= MAX_BUY_MOVES and i < len(order_depth.sell_orders)):
                   best_ask, best_ask_amount = list(order_depth.sell_orders.items())[i]
                   # best_ask_amount is negative
-                  if -best_ask_amount < 0:  # debug
-                    exit(1)
                   if int(best_ask) < acceptable_price:
                       print("BUY", str(-best_ask_amount) + "x", best_ask)
                       buy_moves += -best_ask_amount

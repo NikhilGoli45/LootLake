@@ -36,8 +36,13 @@ class Trader:
       print("Acceptable price : " + str(acceptable_price))
       print("Buy Order depth : " + str(len(order_depth.buy_orders)) + ", Sell order depth : " + str(len(order_depth.sell_orders)))
   
-      MAX_BUY_MOVES = 20  # decreasing this will decrease profit. means this is not doing anything, our model is too simple
-      MAX_SELL_MOVES = 20
+      try:
+        position = state.position[product]
+        MAX_BUY_MOVES = abs(20-position)
+        MAX_SELL_MOVES = abs(-20-position)
+      except: # position is 0 because no trades made yet
+        MAX_BUY_MOVES = 20
+        MAX_SELL_MOVES = 20
       buy_moves = 0
       sell_moves = 0
 
@@ -89,9 +94,14 @@ class Trader:
       acceptable_price = int(price_sum/price_num)
       print("Acceptable price : " + str(acceptable_price))
       print("Buy Order depth : " + str(len(order_depth.buy_orders)) + ", Sell order depth : " + str(len(order_depth.sell_orders)))
-    
-      MAX_BUY_MOVES = 20  # decreasing this will decrease profit. means this is not doing anything, our model is too simple
-      MAX_SELL_MOVES = 20
+
+      try:
+        position = state.position[product]
+        MAX_BUY_MOVES = abs(20-position)
+        MAX_SELL_MOVES = abs(-20-position)
+      except: # position is 0 because no trades made yet
+        MAX_BUY_MOVES = 20
+        MAX_SELL_MOVES = 20
       buy_moves = 0
       sell_moves = 0
       if len(order_depth.sell_orders) != 0:

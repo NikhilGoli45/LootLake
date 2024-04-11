@@ -1,6 +1,7 @@
 from datamodel import OrderDepth, UserId, TradingState, Order
 from typing import List
 import string
+import jsonpickle
 
 
 
@@ -14,14 +15,15 @@ class Trader:
         result = {}
         for product in state.order_depths:
           if product == "AMETHYSTS":
-            result[product] = self.amethysts(state, product)
+            # make sure positions aren't cancelled
+            result[product], _ = self.amethysts(state, product)
           if product == "STARFRUIT":
-            result[product] = self.starfruit(state, product) 
+            result[product], traderData = self.starfruit(state, product) 
 
 		    # String value holding Trader state data required. 
 				# It will be delivered as TradingState.traderData on next execution.
-        traderData = "SAMPLE" 
-        
+        # traderData = "SAMPLE" 
+
 				# Sample conversion request. Check more details below. 
         conversions = 0
         # logger.flush(state, result, conversions, traderData)
@@ -60,12 +62,26 @@ class Trader:
                 orders.append(Order(product, best_bid, max(-MAX_SELL_MOVES,-best_bid_amount)))
             i += 1
 
-      return orders
+      return orders, None
     
     def starfruit(self, state, product):
       order_depth: OrderDepth = state.order_depths[product]
       orders: List[Order] = []
-      acceptable_price = 10000  # Participant should calculate this value
+      # price = state.listings[product]
+      price_sum = 0
+      price_num = 0
+      # name = state.listings[product]["symbol"]
+      # ERROR: product is "STARFRUIT", which does not find the key
+      for trade in state.own_trades[product]:
+        price_sum += trade.price
+        price_num += trade.quantity 
+      try:
+        traderObj = jsonpickle.decode(state.traderData)
+      except:
+         traderObj = MovingArray([], [])
+      traderObj.add_price(float(price_sum)/float(price_num))
+
+      acceptable_price = traderObj.get_avgs()[0]  # Participant should calculate this value
       print("Acceptable price : " + str(acceptable_price))
       print("Buy Order depth : " + str(len(order_depth.buy_orders)) + ", Sell order depth : " + str(len(order_depth.sell_orders)))
   
@@ -94,5 +110,29 @@ class Trader:
                 sell_moves += best_bid_amount
                 orders.append(Order(product, best_bid, max(-MAX_SELL_MOVES,-best_bid_amount)))
             i += 1
+      return orders, jsonpickle.encode(traderObj)
+    
+class MovingArray(object):
+    def __init__(self, arr9: list[float], arr20: list[float]):
+      self.arr9 = arr9
+      self.arr20 = arr20
 
-      return orders
+    def add_price(self, price):
+        self.arr9.append(float(price))
+        if len(self.arr9) > 9:
+          self.arr9.pop(0)
+
+        self.arr20.append(float(price))
+        if len(self.arr20) > 20:
+            self.arr20.pop(0)
+
+    def get_avgs(self):
+        sum9 = 0
+        sum20 = 0
+        for i in self.arr9:
+          sum9 += i
+        for i in self.arr20:
+          sum20 += i
+        sum9 = sum9/len(self.arr9)
+        sum20 = sum20/len(self.arr20)
+        return (sum9, sum20)

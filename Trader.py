@@ -72,13 +72,22 @@ class Trader:
       price_num = 0
       # name = state.listings[product]["symbol"]
       # ERROR: product is "STARFRUIT", which does not find the key
-      for trade in state.own_trades[product]:
-        price_sum += trade.price
-        price_num += trade.quantity 
+      #if not state.own_trades:
+      #   exit(1)
+      try:
+        for trade in state.market_trades[product]:
+          price_sum += trade.price
+          price_num += trade.quantity
+      except:
+        price_sum = 5000
+        price_num = 1
       try:
         traderObj = jsonpickle.decode(state.traderData)
       except:
          traderObj = MovingArray([], [])
+
+      if(price_num == 0):
+         price_num = 1
       traderObj.add_price(float(price_sum)/float(price_num))
 
       acceptable_price = traderObj.get_avgs()[0]  # Participant should calculate this value
@@ -94,7 +103,8 @@ class Trader:
           while(buy_moves <= MAX_BUY_MOVES and i < len(order_depth.sell_orders)):
             best_ask, best_ask_amount = list(order_depth.sell_orders.items())[i]
             # best_ask_amount is negative
-            if int(best_ask) < acceptable_price:
+            # if int(best_ask) < acceptable_price:
+            if traderObj.get_avgs()[0] > traderObj.get_avgs()[1]:
                 print("BUY", str(-best_ask_amount) + "x", best_ask)
                 buy_moves += -best_ask_amount
                 orders.append(Order(product, best_ask, min(MAX_BUY_MOVES,-best_ask_amount)))
@@ -105,7 +115,8 @@ class Trader:
           while(sell_moves <= MAX_SELL_MOVES and i < len(order_depth.buy_orders)):
             best_bid, best_bid_amount = list(order_depth.buy_orders.items())[i]
             # best_bid_amount is postive
-            if int(best_bid) > acceptable_price:
+            # if int(best_bid) > acceptable_price:
+            if traderObj.get_avgs()[0] < traderObj.get_avgs()[1]:
                 print("SELL", str(best_bid_amount) + "x", best_bid)
                 sell_moves += best_bid_amount
                 orders.append(Order(product, best_bid, max(-MAX_SELL_MOVES,-best_bid_amount)))

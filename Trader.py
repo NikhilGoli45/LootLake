@@ -38,15 +38,29 @@ class Trader:
   
       try:
         position = state.position[product]
-        MAX_BUY_MOVES = abs(20-position)
-        MAX_SELL_MOVES = abs(-20-position)
+        MAX_BUY_MOVES = 20-position
+        MAX_SELL_MOVES = -(-20-position)
       except: # position is 0 because no trades made yet
         MAX_BUY_MOVES = 20
         MAX_SELL_MOVES = 20
       buy_moves = 0
       sell_moves = 0
+      
+      # IN PROGRESS
+      buy_sum = 0
+      sell_sum = 0
+      for item in list(order_depth.sell_orders.items()):
+          if int(item[0]) < acceptable_price:
+            print("PRINTING: ")
+            print(-item[1])
+            buy_sum += -item[1]
+      for item in list(order_depth.buy_orders.items()):
+          if int(item[0]) > acceptable_price:
+            sell_sum += item[1]
+      MAX_BUY_MOVES = 20-min(buy_sum, sell_sum)
+      MAX_SELL_MOVES = 20+min(buy_sum, sell_sum)
 
-      if len(order_depth.sell_orders) != 0:
+      if len(order_depth.sell_orders) != 0:  # check not necessary
           i = 0
           while(buy_moves <= MAX_BUY_MOVES and i < len(order_depth.sell_orders)):
             best_ask, best_ask_amount = list(order_depth.sell_orders.items())[i]
@@ -104,6 +118,7 @@ class Trader:
         MAX_SELL_MOVES = 20
       buy_moves = 0
       sell_moves = 0
+
       if len(order_depth.sell_orders) != 0:
           i = 0
           while(buy_moves <= MAX_BUY_MOVES and i < len(order_depth.sell_orders)):

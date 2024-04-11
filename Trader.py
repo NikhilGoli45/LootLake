@@ -32,7 +32,7 @@ class Trader:
     def amethysts(self, state, product):
       order_depth: OrderDepth = state.order_depths[product]
       orders: List[Order] = []
-      acceptable_price = 10000  # Participant should calculate this value
+      acceptable_price = 10000.0  # Participant should calculate this value
 
       print("Acceptable price : " + str(acceptable_price))
       print("Buy Order depth : " + str(len(order_depth.buy_orders)) + ", Sell order depth : " + str(len(order_depth.sell_orders)))
@@ -48,7 +48,7 @@ class Trader:
       sell_moves = 0
       
       """
-      # IN PROGRESS
+      # IN PROGRESS: increase amount we can trade and stay within limits
       buy_sum = 0
       sell_sum = 0
       for item in list(order_depth.sell_orders.items()):
@@ -69,7 +69,7 @@ class Trader:
           while(buy_moves <= MAX_BUY_MOVES and i < len(order_depth.sell_orders)):
             best_ask, best_ask_amount = list(order_depth.sell_orders.items())[i]
             # best_ask_amount is negative
-            if int(best_ask) < acceptable_price:
+            if best_ask < acceptable_price:
                 print("BUY", str(-best_ask_amount) + "x", best_ask)
                 buy_moves += -best_ask_amount
                 orders.append(Order(product, best_ask, min(MAX_BUY_MOVES,-best_ask_amount)))
@@ -80,7 +80,7 @@ class Trader:
           while(sell_moves <= MAX_SELL_MOVES and i < len(order_depth.buy_orders)):
             best_bid, best_bid_amount = list(order_depth.buy_orders.items())[i]
             # best_bid_amount is postive
-            if int(best_bid) > acceptable_price:
+            if best_bid > acceptable_price:
                 print("SELL", str(best_bid_amount) + "x", best_bid)
                 sell_moves += best_bid_amount
                 orders.append(Order(product, best_bid, max(-MAX_SELL_MOVES,-best_bid_amount)))
@@ -91,12 +91,7 @@ class Trader:
     def starfruit(self, state, product):
       order_depth: OrderDepth = state.order_depths[product]
       orders: List[Order] = []
-      # price = state.listings[product]
-      # name = state.listings[product]["symbol"]
-      # ERROR: product is "STARFRUIT", which does not find the key
-      #if not state.own_trades:
-      #   exit(1)
-      #try:
+
       price_sum = 0
       price_num = 0
       if state.market_trades:

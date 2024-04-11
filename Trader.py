@@ -33,6 +33,7 @@ class Trader:
       order_depth: OrderDepth = state.order_depths[product]
       orders: List[Order] = []
       acceptable_price = 10000  # Participant should calculate this value
+
       print("Acceptable price : " + str(acceptable_price))
       print("Buy Order depth : " + str(len(order_depth.buy_orders)) + ", Sell order depth : " + str(len(order_depth.sell_orders)))
   
@@ -91,24 +92,25 @@ class Trader:
       order_depth: OrderDepth = state.order_depths[product]
       orders: List[Order] = []
       # price = state.listings[product]
-      price_sum = 0
-      price_num = 0
       # name = state.listings[product]["symbol"]
       # ERROR: product is "STARFRUIT", which does not find the key
       #if not state.own_trades:
       #   exit(1)
       #try:
-      #for trade in state.order_depths[product]:
-        #price_sum += trade.price*trade.quantity
-        #price_num += trade.quantity
+      price_sum = 0
+      price_num = 0
+      if state.market_trades:
+        for trade in state.market_trades[product]:
+          price_sum += trade.price*trade.quantity
+          price_num += trade.quantity
       for x in state.order_depths[product].buy_orders:
         price_sum += abs(x*state.order_depths[product].buy_orders[x])
         price_num += abs(state.order_depths[product].buy_orders[x])
       for y in state.order_depths[product].sell_orders:
         price_sum += abs(-y*state.order_depths[product].sell_orders[y])
         price_num += abs(state.order_depths[product].sell_orders[y])
-      
-      acceptable_price = int(price_sum/price_num)
+
+      acceptable_price = price_sum//price_num  # want to calculate smth more accurate
       print("Acceptable price : " + str(acceptable_price))
       print("Buy Order depth : " + str(len(order_depth.buy_orders)) + ", Sell order depth : " + str(len(order_depth.sell_orders)))
 

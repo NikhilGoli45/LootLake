@@ -8,8 +8,8 @@ import jsonpickle
 class Trader:
     
     def run(self, state: TradingState):
-        print("traderData: " + state.traderData)
-        print("Observations: " + str(state.observations))
+        #print("traderData: " + state.traderData)
+        #print("Observations: " + str(state.observations))
 
 				# Orders to be placed on exchange matching engine
         result = {}
@@ -33,8 +33,8 @@ class Trader:
       order_depth: OrderDepth = state.order_depths[product]
       orders: List[Order] = []
       acceptable_price = 10000  # Participant should calculate this value
-      print("Acceptable price : " + str(acceptable_price))
-      print("Buy Order depth : " + str(len(order_depth.buy_orders)) + ", Sell order depth : " + str(len(order_depth.sell_orders)))
+      #print("Acceptable price : " + str(acceptable_price))
+      #print("Buy Order depth : " + str(len(order_depth.buy_orders)) + ", Sell order depth : " + str(len(order_depth.sell_orders)))
   
       MAX_BUY_MOVES = 20  # decreasing this will decrease profit. means this is not doing anything, our model is too simple
       MAX_SELL_MOVES = 20
@@ -91,9 +91,9 @@ class Trader:
       traderObj.add_price(float(price_sum)/float(price_num))
 
       short_avg, long_avg, old_diff = traderObj.get_avgs()  # Participant should calculate this value
-      print("Acceptable price : " + str(short_avg)) # changed from acceptable_price
-      print("Buy Order depth : " + str(len(order_depth.buy_orders)) + ", Sell order depth : " + str(len(order_depth.sell_orders)))
-  
+      #print("Acceptable price : " + str(short_avg)) # changed from acceptable_price
+      # print("Buy Order depth : " + str(len(order_depth.buy_orders)) + ", Sell order depth : " + str(len(order_depth.sell_orders)))
+      print("Short average: " + str(short_avg) + "Long average: " + str(long_avg))
       MAX_BUY_MOVES = 20  # decreasing this will decrease profit. means this is not doing anything, our model is too simple
       MAX_SELL_MOVES = 20
       buy_moves = 0
@@ -106,7 +106,7 @@ class Trader:
             # if int(best_ask) < acceptable_price:
             # short term should be greater
             if short_avg-long_avg > 0 and old_diff < 0:
-                print("BUY", str(-best_ask_amount) + "x", best_ask)
+                # print("BUY", str(-best_ask_amount) + "x", best_ask)
                 buy_moves += -best_ask_amount
                 orders.append(Order(product, best_ask, min(MAX_BUY_MOVES,-best_ask_amount)))
             i += 1
@@ -119,12 +119,12 @@ class Trader:
             # if int(best_bid) > acceptable_price:
             # if traderObj.get_avgs()[0] < traderObj.get_avgs()[1]:
             if short_avg-long_avg < 0 and old_diff > 0:
-                print("SELL", str(best_bid_amount) + "x", best_bid)
+                # print("SELL", str(best_bid_amount) + "x", best_bid)
                 sell_moves += best_bid_amount
                 orders.append(Order(product, best_bid, max(-MAX_SELL_MOVES,-best_bid_amount)))
             i += 1
       return orders, jsonpickle.encode(traderObj)
-    
+
 class MovingArray(object):
     def __init__(self, arr9: list[float], arr20: list[float]):
       self.arr9 = arr9
@@ -132,12 +132,14 @@ class MovingArray(object):
       self.difference = 0
 
     def add_price(self, price):
+        # make more efficient: only store the longer array
+
         self.arr9.append(float(price))
-        if len(self.arr9) > 9:
+        if len(self.arr9) > 150:
           self.arr9.pop(0)
 
         self.arr20.append(float(price))
-        if len(self.arr20) > 20:
+        if len(self.arr20) > 400:
             self.arr20.pop(0)
 
     def get_avgs(self):

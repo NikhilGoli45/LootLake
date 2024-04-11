@@ -25,7 +25,7 @@ class Trader:
         traderData = "SAMPLE" 
 
 				# Sample conversion request. Check more details below. 
-        conversions = 0
+        conversions = 1
         # logger.flush(state, result, conversions, traderData)
         return result, conversions, traderData
 
@@ -46,19 +46,22 @@ class Trader:
       buy_moves = 0
       sell_moves = 0
       
+      """
       # IN PROGRESS
       buy_sum = 0
       sell_sum = 0
       for item in list(order_depth.sell_orders.items()):
           if int(item[0]) < acceptable_price:
-            print("PRINTING: ")
-            print(-item[1])
             buy_sum += -item[1]
       for item in list(order_depth.buy_orders.items()):
           if int(item[0]) > acceptable_price:
             sell_sum += item[1]
-      MAX_BUY_MOVES = 20-min(buy_sum, sell_sum)
-      MAX_SELL_MOVES = 20+min(buy_sum, sell_sum)
+      MAX_BUY_MOVES += abs(min(buy_sum, sell_sum))
+      MAX_SELL_MOVES += abs(min(buy_sum, sell_sum))
+      print("PRINTING: ")
+      print(MAX_BUY_MOVES)
+      print(MAX_SELL_MOVES)
+      """
 
       if len(order_depth.sell_orders) != 0:  # check not necessary
           i = 0

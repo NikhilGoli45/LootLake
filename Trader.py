@@ -103,8 +103,8 @@ class Trader:
           while(buy_moves <= MAX_BUY_MOVES and i < len(order_depth.sell_orders)):
             best_ask, best_ask_amount = list(order_depth.sell_orders.items())[i]
             # best_ask_amount is negative
-            # if int(best_ask) < acceptable_price:
-            if traderObj.get_avgs()[0] > traderObj.get_avgs()[1]:
+            if int(best_ask) < acceptable_price:
+            # if traderObj.get_avgs()[0] > traderObj.get_avgs()[1]:
                 print("BUY", str(-best_ask_amount) + "x", best_ask)
                 buy_moves += -best_ask_amount
                 orders.append(Order(product, best_ask, min(MAX_BUY_MOVES,-best_ask_amount)))
@@ -115,8 +115,8 @@ class Trader:
           while(sell_moves <= MAX_SELL_MOVES and i < len(order_depth.buy_orders)):
             best_bid, best_bid_amount = list(order_depth.buy_orders.items())[i]
             # best_bid_amount is postive
-            # if int(best_bid) > acceptable_price:
-            if traderObj.get_avgs()[0] < traderObj.get_avgs()[1]:
+            if int(best_bid) > acceptable_price:
+            # if traderObj.get_avgs()[0] < traderObj.get_avgs()[1]:
                 print("SELL", str(best_bid_amount) + "x", best_bid)
                 sell_moves += best_bid_amount
                 orders.append(Order(product, best_bid, max(-MAX_SELL_MOVES,-best_bid_amount)))
@@ -130,11 +130,11 @@ class MovingArray(object):
 
     def add_price(self, price):
         self.arr9.append(float(price))
-        if len(self.arr9) > 9:
+        if len(self.arr9) > 1:
           self.arr9.pop(0)
 
         self.arr20.append(float(price))
-        if len(self.arr20) > 20:
+        if len(self.arr20) > 5:
             self.arr20.pop(0)
 
     def get_avgs(self):

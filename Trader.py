@@ -40,13 +40,14 @@ class Trader:
       MAX_SELL_MOVES = 20
       buy_moves = 0
       sell_moves = 0
+
       if len(order_depth.sell_orders) != 0:
           i = 0
           while(buy_moves <= MAX_BUY_MOVES and i < len(order_depth.sell_orders)):
             best_ask, best_ask_amount = list(order_depth.sell_orders.items())[i]
             # best_ask_amount is negative
             if int(best_ask) < acceptable_price:
-                print("BUY", str(-best_ask_amount) + "x", best_ask)
+                # print("BUY", str(-best_ask_amount) + "x", best_ask)
                 buy_moves += -best_ask_amount
                 orders.append(Order(product, best_ask, min(MAX_BUY_MOVES,-best_ask_amount)))
             i += 1
@@ -57,7 +58,7 @@ class Trader:
             best_bid, best_bid_amount = list(order_depth.buy_orders.items())[i]
             # best_bid_amount is postive
             if int(best_bid) > acceptable_price:
-                print("SELL", str(best_bid_amount) + "x", best_bid)
+                # print("SELL", str(best_bid_amount) + "x", best_bid)
                 sell_moves += best_bid_amount
                 orders.append(Order(product, best_bid, max(-MAX_SELL_MOVES,-best_bid_amount)))
             i += 1
@@ -74,18 +75,26 @@ class Trader:
       # ERROR: product is "STARFRUIT", which does not find the key
       #if not state.own_trades:
       #   exit(1)
-      try:
-        for trade in state.market_trades[product]:
-          price_sum += trade.price*trade.quantity
-          price_num += trade.quantity
-      except:
-        price_sum = 5000
-        price_num = 1
+      #try:
+      #for trade in state.order_depths[product]:
+        #price_sum += trade.price*trade.quantity
+        #price_num += trade.quantity
+      for x in state.order_depths[product].buy_orders:
+        price_sum += abs(x*state.order_depths[product].buy_orders[x])
+        price_num += abs(state.order_depths[product].buy_orders[x])
+      for y in state.order_depths[product].sell_orders:
+        price_sum += abs(-y*state.order_depths[product].sell_orders[y])
+        price_num += abs(state.order_depths[product].sell_orders[y])
+      
+      acceptable_price = int(price_sum/price_num)
+      #except:
+      #  price_sum = 5000
+      #  price_num = 1
       try:
         traderObj = jsonpickle.decode(state.traderData)
       except:
          traderObj = MovingArray([], [])
-
+      """
       if(price_num == 0):
          price_num = 1
       traderObj.add_price(float(price_sum)/float(price_num))
@@ -106,7 +115,7 @@ class Trader:
             # if int(best_ask) < acceptable_price:
             # short term should be greater
             if short_avg-long_avg > 0 and old_diff < 0:
-                # print("BUY", str(-best_ask_amount) + "x", best_ask)
+                print("BUY", str(-best_ask_amount) + "x", best_ask)
                 buy_moves += -best_ask_amount
                 orders.append(Order(product, best_ask, min(MAX_BUY_MOVES,-best_ask_amount)))
             i += 1
@@ -119,6 +128,32 @@ class Trader:
             # if int(best_bid) > acceptable_price:
             # if traderObj.get_avgs()[0] < traderObj.get_avgs()[1]:
             if short_avg-long_avg < 0 and old_diff > 0:
+                print("SELL", str(best_bid_amount) + "x", best_bid)
+                sell_moves += best_bid_amount
+                orders.append(Order(product, best_bid, max(-MAX_SELL_MOVES,-best_bid_amount)))
+            i += 1
+            """
+      MAX_BUY_MOVES = 20  # decreasing this will decrease profit. means this is not doing anything, our model is too simple
+      MAX_SELL_MOVES = 20
+      buy_moves = 0
+      sell_moves = 0
+      if len(order_depth.sell_orders) != 0:
+          i = 0
+          while(buy_moves <= MAX_BUY_MOVES and i < len(order_depth.sell_orders)):
+            best_ask, best_ask_amount = list(order_depth.sell_orders.items())[i]
+            # best_ask_amount is negative
+            if int(best_ask) < acceptable_price:
+                # print("BUY", str(-best_ask_amount) + "x", best_ask)
+                buy_moves += -best_ask_amount
+                orders.append(Order(product, best_ask, min(MAX_BUY_MOVES,-best_ask_amount)))
+            i += 1
+
+      if len(order_depth.buy_orders) != 0:
+          i = 0
+          while(sell_moves <= MAX_SELL_MOVES and i < len(order_depth.buy_orders)):
+            best_bid, best_bid_amount = list(order_depth.buy_orders.items())[i]
+            # best_bid_amount is postive
+            if int(best_bid) > acceptable_price:
                 # print("SELL", str(best_bid_amount) + "x", best_bid)
                 sell_moves += best_bid_amount
                 orders.append(Order(product, best_bid, max(-MAX_SELL_MOVES,-best_bid_amount)))
@@ -135,11 +170,11 @@ class MovingArray(object):
         # make more efficient: only store the longer array
 
         self.arr9.append(float(price))
-        if len(self.arr9) > 150:
+        if len(self.arr9) > 9:
           self.arr9.pop(0)
 
         self.arr20.append(float(price))
-        if len(self.arr20) > 400:
+        if len(self.arr20) > 20:
             self.arr20.pop(0)
 
     def get_avgs(self):

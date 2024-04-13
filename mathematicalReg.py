@@ -201,11 +201,11 @@ class Trader:
         
       traderObj.add_vals((float(price_sum)/float(price_num)), state.timestamp)
       acceptable_price = float(price_sum)/float(price_num)
-      print(len(traderObj.arr5))
+      print(len(traderObj.arr8))
       buy_moves = 0
       sell_moves = 0
 
-      if len(traderObj.arr5) != 5:
+      if len(traderObj.arr8) != 8:
         
         if len(order_depth.sell_orders) != 0:
             i = 0
@@ -229,7 +229,6 @@ class Trader:
                   orders.append(Order(product, best_bid, max(-MAX_SELL_MOVES,-best_bid_amount)))
               i += 1
       else:
-        print("We make LR trades!")
         predicted_price = traderObj.predictSF(state.timestamp)
         
         if predicted_price > acceptable_price:
@@ -258,34 +257,44 @@ class Trader:
 
 class MovingArray(object):
     def __init__(self):
-      self.beta_1 = 0
-      self.beta_0 = 0
-      self.arr5 = []
-      self.time5 = []
+
+      self.arr8 = []
+      self.time8 = []
 
     def add_vals(self, price, time):
-        self.arr5.append(float(price))
-        self.time5.append(float(time))
+        self.arr8.append(float(price))
+        self.time8.append(float(time))
 
-        if len(self.arr5) > 5:
-          self.arr5.pop(0)
+        if len(self.arr8) > 8:
+          self.arr8.pop(0)
 
-        if len(self.time5) > 5:
-          self.time5.pop(0)
+        if len(self.time8) > 8:
+          self.time8.pop(0)
 
     def trainModel(self, m_now, b_now):
       m_gradient = 0
       b_gradient = 0
-      learning_rate = 0.1
+      learning_rate = 0.01
       
-      n = len(self.arr5)
       
-      for i in range (5):
-        x = self.time5
-        y = self.arr5
+      
+      x = self.time8
+      y = self.arr8
 
-        m_gradient += -(2/n) * x[i] * (y[i] - (m_now * x[i] + b_now))
-        b_gradient += -(2/n) * (y[i] - (m_now * x[i] + b_now))
+
+      x_proc  = [0] * 4
+      y_proc  = [0] * 4
+
+      for k in range (4):
+        x_proc[k] = (float(x[(2*k)] + x[(2*k) + 1]))/2
+        y_proc[k] = (float(y[(2*k)] + y[(2*k) + 1]))/2
+      
+      n = len(x_proc)
+      for i in range (4):
+       
+
+        m_gradient += -(2/n) * x_proc[i] * (y_proc[i] - (m_now * x_proc[i] + b_now))
+        b_gradient += -(2/n) * (y_proc[i] - (m_now * x_proc[i] + b_now))
 
       m = m_now - m_gradient * learning_rate
       b = m_now - b_gradient * learning_rate
@@ -295,9 +304,10 @@ class MovingArray(object):
     def predictSF(self, current_feature: float) -> float:
       m = 0 
       b = 0
-      epochs = 10
+      epochs = 100
       for i in range(epochs):
-         m, b = self.trainModel(m, b)
+        print("m = " + str(m) + " and b = " + str(b))
+        m, b = self.trainModel(m, b)
       
       pred = (m*current_feature) + b
       return pred

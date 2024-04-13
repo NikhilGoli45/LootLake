@@ -276,7 +276,7 @@ class MovingArray(object):
     def trainModel(self, m_now, b_now):
       m_gradient = 0
       b_gradient = 0
-      learning_rate = 0.1
+      learning_rate = 20
       
       n = len(self.arr5)
       

@@ -21,6 +21,8 @@ class Trader:
             result[product] = self.amethysts(state, product)
           if product == "STARFRUIT":
             result[product], traderData = self.starfruit(state, product) 
+          if product == "ORCHIDS":
+            result[product] = self.orchid(state, product)
 
 		    # String value holding Trader state data required. 
 				# It will be delivered as TradingState.traderData on next execution.
@@ -242,6 +244,86 @@ class Trader:
             current_pos += amount
 
       return orders, jsonpickle.encode(traderObj)
+
+    def orchid(self, state, product):
+        order_depth: OrderDepth = state.order_depths[product]
+        orders: List[Order] = []
+
+        cObservation = state.observations.conversionObservations[product]
+        foreign_bid = cObservation.bidPrice
+        foreign_ask = cObservation.askPrice
+        export = cObservation.exportTariff
+        Import = cObservation.importTariff
+        transport = cObservation.transportFees
+
+        print("FOREIGN MID: " + str((foreign_bid + foreign_ask) / 2))
+
+        sells = sorted(order_depth.sell_orders.items())
+        buys = sorted(order_depth.buy_orders.items(), reverse=True)
+
+        sellq = 0
+        sellp = -1
+        maxq = -1
+        for ask, quantity in sells:
+          sellq -= quantity
+          if sellq > maxq:
+            maxq = quantity
+            sellp = ask
+            
+        buyq = 0
+        buyp = -1
+        maxq = -1
+        for ask, quantity in buys:
+          buyq += quantity
+          if buyq > maxq:
+            maxq = quantity
+            buyp = ask
+
+        price_sum = 0
+        price_num = 0
+
+
+        #actual price
+        for x in state.order_depths[product].buy_orders:
+          price_sum += abs(x*state.order_depths[product].buy_orders[x])
+          price_num += abs(state.order_depths[product].buy_orders[x])
+        for y in state.order_depths[product].sell_orders:
+          price_sum += abs(-y*state.order_depths[product].sell_orders[y])
+          price_num += abs(state.order_depths[product].sell_orders[y])
+        acceptable_price = float(price_sum)/float(price_num)        
+
+
+        position = 0
+        current_pos = position
+
+        foreign_price = (foreign_ask + foreign_bid) / 2
+
+        print("PREDICTION: " + str(foreign_price))
+        print("ACCEPTABLE: " + str(acceptable_price))
+
+        if acceptable_price <= foreign_price: 
+          print("BUY OPPORTUNITY")
+          foreign_price = foreign_price - transport - export
+          print("PREDICTION: " + str(foreign_price))
+          print("ACCEPTABLE: " + str(acceptable_price))
+          max_price = -1
+          for ask, quanity in sells:
+            if ((ask < foreign_price) or ((position < 0) and (ask == foreign_price))) and current_pos < 20:
+              max_price = max(max_price, ask)
+              amount = min(-quanity, 100 - current_pos)
+              current_pos += amount
+              orders.append(Order(product, ask, amount))
+        else:
+          print("SELL OPPORTUNITY")
+          current_pos = position
+          for bid, quantity in buys:
+            if ((bid > foreign_price) or ((position > 0) and (bid == foreign_price))) and current_pos > -20:
+              amount = max(-quantity, -100-current_pos)
+              current_pos += amount
+              orders.append(Order(product, bid, amount))
+
+        print("NUM CONVERSION: " + str(state.position.get(product, 0)))
+        return orders, -state.position.get(product, 0)
 
 class MovingArray(object):
     def __init__(self, arr5: list[float], time5: list[float]):

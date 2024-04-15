@@ -3,6 +3,8 @@ from typing import List
 import string
 import jsonpickle
 import statistics
+import numpy as np
+from sklearn.linear_model import LinearRegression
 
 
 
@@ -535,7 +537,7 @@ class Trader:
                   orders.append(Order(product, best_bid, max(-MAX_SELL_MOVES,-best_bid_amount)))
               i += 1
       else:
-        predicted_price = traderObj.predictSF(state.timestamp)
+        predicted_price = traderObj.predwithSkiKit(state.timestamp)
         
         if predicted_price > acceptable_price:
           if len(order_depth.sell_orders) != 0:
@@ -617,6 +619,15 @@ class MovingArray(object):
       
       pred = (m*current_feature) + b
       return pred
-         
+    
+    def predwithSkiKit(self, current_feature: float) -> float:
+       regressor = LinearRegression()
+       x = np.array(self.time8).reshape((-1, 1))
+       y = np.array(self.arr8)
+       regression = regressor.fit(x, y)
+       m = regression.coef_
+       b = regression.intercept_
+       pred = (m * current_feature) + b
+       return pred   
 
     

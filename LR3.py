@@ -30,11 +30,12 @@ class Trader:
         conversions = 0
         # logger.flush(state, result, conversions, traderData)
         return result, conversions, traderData
+    
     def amethysts(self, state, product):
         
         order_depth: OrderDepth = state.order_depths[product]
         orders: list[Order] = []
-
+        """
         cpos = state.position.get('AMETHYSTS', 0)
 
         osell = order_depth.sell_orders
@@ -101,6 +102,7 @@ class Trader:
             num = max(-40, -20-cpos)
             orders.append(Order(product, sell_pr, num))
             cpos += num
+        """
         return orders, None
     
     def values_extract(self, order_dict, buy=0):

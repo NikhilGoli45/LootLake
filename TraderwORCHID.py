@@ -146,12 +146,12 @@ class Trader:
     def orchidArbitrage(self, state: TradingState, acceptable_price : float) -> int:
        #assume that there is a nonzero position if this function is called
         currPos = state.position
-        product = "ORCHIDS"
+        product = "ORCHID"
         conversionObservation = state.observations.conversionObservations[product]
         if currPos < 0:
             valAfterCosts = conversionObservation.askPrice + conversionObservation.transportFees + conversionObservation.importTariff
             if valAfterCosts < acceptable_price:
-               return -currPos
+               return 100 + currPos
 
         else:
             valAfterCosts = conversionObservation.bidPrice - conversionObservation.transportFees - conversionObservation.exportTariff

@@ -15,6 +15,7 @@ class Trader:
 
 				# Orders to be placed on exchange matching engine
         result = {}
+        conversions = 0
         for product in state.order_depths:
           if product == "AMETHYSTS":
             # make sure positions aren't cancelled
@@ -22,14 +23,14 @@ class Trader:
           if product == "STARFRUIT":
             result[product], traderData = self.starfruit(state, product) 
           if product == "ORCHIDS":
-            result[product] = self.orchid(state, product)
+            result[product], conversions = self.orchid(state, product)
 
 		    # String value holding Trader state data required. 
 				# It will be delivered as TradingState.traderData on next execution.
-        #traderData = "SAMPLE" 
+        # traderData = "SAMPLE" 
 
 				# Sample conversion request. Check more details below. 
-        conversions = 0
+        
         # logger.flush(state, result, conversions, traderData)
         return result, conversions, traderData
 
@@ -39,6 +40,8 @@ class Trader:
 
       sells = sorted(order_depth.sell_orders.items())
       buys = sorted(order_depth.buy_orders.items(), reverse=True)
+      for bid, q in buys:
+        print("PRICE: " + str(bid))
 
       sellq = 0
       sellp = -1
@@ -324,6 +327,58 @@ class Trader:
 
         print("NUM CONVERSION: " + str(state.position.get(product, 0)))
         return orders, -state.position.get(product, 0)
+
+    def gift_basket(self, order_depth):
+
+        POSITION_LIMIT = {'CHOCOLATE': 250, 'STRAWBERRIES': 350, 'ROSES': 60, 'GIFT_BASKET': 60}
+
+        orders = {'CHOCOLATE' : [], 'STRAWBERRIES': [], 'ROSES' : [], 'GIFT_BASKET' : []}
+        goods = ['CHOCOLATE', 'STRAWBERRIES', 'ROSES', 'GIFT_BASKET']
+        available_sells, available_buys, best_ask, best_bid, worst_ask, worst_bid, mid_price, available_buyq, available_sellq = {}, {}, {}, {}, {}, {}, {}, {}, {}
+
+        for item in goods:
+            available_sells[item] = sorted(order_depth[item].sell_orders.items())
+            available_buys[item] = sorted(order_depth[item].buy_orders.items(), reverse=True)
+
+            best_ask[item] = next(iter(available_sells[item]))
+            best_bid[item] = next(iter(available_buys[item]))
+
+            worst_ask[item] = next(reversed(available_sells[item]))
+            worst_bid[item] = next(reversed(available_buys[item]))
+
+            mid_price[item] = (best_ask[item] + best_bid[item])/2
+            available_buyq[item], available_sellq[item] = 0, 0
+            for price, quantity in available_buys[item].items():
+                available_buyq[item] += quantity 
+                if available_buyq[item] >= POSITION_LIMIT[item]/10:
+                    break
+            for price, quantity in available_sells[item].items():
+                available_sellq[item] += -quantity 
+                if available_sellq[item] >= POSITION_LIMIT[item]/10:
+                    break
+
+        buy_baskets = best_ask['GIFT_BASKET'] - (best_bid['CHOCOLATE']*4) - (best_bid['STRAWBERRIES']*6) - best_bid['ROSES']
+        sell_baskets = best_bid['GIFT_BASKET'] - (best_ask['CHOCOLATE']*4) - (best_ask['STRAWBERRIES']*6) - best_ask['ROSES']
+
+        return orders
+    
+    def get_item_price(self, product, order_book, bidorask):
+      etf = {'CHOCOLATE': 4, 'STRAWBERRIES': 6, 'ROSES': 1}
+      orders = {}
+      if bidorask == "BID":
+        for i in range(etf[product]):
+          orders[next(iter(order_book))] = 0
+
+    '''
+    so basically what we need to do is we need to first decide whether we are gonna buy baksets and sell the
+    individual items or the opposite. In order to do this we need to get the average price of the next __ items based
+    on how many of them are in the basket, and then substract that from teh total gift basket price.
+    Then we need to place orders at the exact prices of the ___ items that we are buying or selling, which isn't hard,
+    but it hard to think about how to do it best.
+    '''
+
+
+
 
 class MovingArray(object):
     def __init__(self, arr5: list[float], time5: list[float]):

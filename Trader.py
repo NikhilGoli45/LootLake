@@ -1,5 +1,6 @@
 from datamodel import OrderDepth, UserId, TradingState, Order
 from typing import List
+from collections import OrderedDict
 import string
 import jsonpickle
 import statistics
@@ -8,6 +9,10 @@ import numpy as np
 
 
 class Trader:
+
+
+    basket_std = 76
+    basket_mean = 380
     
     def run(self, state: TradingState):
         #print("traderData: " + state.traderData)
@@ -16,18 +21,26 @@ class Trader:
 				# Orders to be placed on exchange matching engine
         result = {}
         conversions = 0
+        '''
         for product in state.order_depths:
           if product == "AMETHYSTS":
             # make sure positions aren't cancelled
             result[product] = self.amethysts(state, product)
           if product == "STARFRUIT":
             result[product], traderData = self.starfruit(state, product) 
-          if product == "ORCHIDS":
+          if product == "ORCHIDS": 
             result[product], conversions = self.orchid(state, product)
+        '''
+        
+        orders = self.gift_basket(state)
+        result['GIFT_BASKET'] = orders['GIFT_BASKET']
+        result['CHOCOLATE'] = orders['CHOCOLATE']
+        result['STRAWBERRIES'] = orders['STRAWBERRIES']
+        result['ROSES'] = orders['ROSES']
 
 		    # String value holding Trader state data required. 
 				# It will be delivered as TradingState.traderData on next execution.
-        # traderData = "SAMPLE" 
+        traderData = "SAMPLE" 
 
 				# Sample conversion request. Check more details below. 
         
@@ -328,17 +341,17 @@ class Trader:
         print("NUM CONVERSION: " + str(state.position.get(product, 0)))
         return orders, -state.position.get(product, 0)
 
-    def gift_basket(self, order_depth):
+    def gift_basket(self, state):
 
         POSITION_LIMIT = {'CHOCOLATE': 250, 'STRAWBERRIES': 350, 'ROSES': 60, 'GIFT_BASKET': 60}
 
         orders = {'CHOCOLATE' : [], 'STRAWBERRIES': [], 'ROSES' : [], 'GIFT_BASKET' : []}
         goods = ['CHOCOLATE', 'STRAWBERRIES', 'ROSES', 'GIFT_BASKET']
         available_sells, available_buys, best_ask, best_bid, worst_ask, worst_bid, mid_price, available_buyq, available_sellq = {}, {}, {}, {}, {}, {}, {}, {}, {}
-
+        
         for item in goods:
-            available_sells[item] = sorted(order_depth[item].sell_orders.items())
-            available_buys[item] = sorted(order_depth[item].buy_orders.items(), reverse=True)
+            available_sells[item] = OrderedDict(sorted(state.order_depths[item].sell_orders.items()))
+            available_buys[item] = OrderedDict(sorted(state.order_depths[item].buy_orders.items(), reverse=True))
 
             best_ask[item] = next(iter(available_sells[item]))
             best_bid[item] = next(iter(available_buys[item]))
@@ -346,7 +359,7 @@ class Trader:
             worst_ask[item] = next(reversed(available_sells[item]))
             worst_bid[item] = next(reversed(available_buys[item]))
 
-            mid_price[item] = (best_ask[item] + best_bid[item])/2
+            mid_price[item] = (best_ask[item] + best_bid[item])//2
             available_buyq[item], available_sellq[item] = 0, 0
             for price, quantity in available_buys[item].items():
                 available_buyq[item] += quantity 
@@ -356,18 +369,142 @@ class Trader:
                 available_sellq[item] += -quantity 
                 if available_sellq[item] >= POSITION_LIMIT[item]/10:
                     break
+        
+        avg_basket_ask, basket_ask, available_sells['GIFT_BASKET'] = self.get_item_price('GIFT_BASKET', available_sells['GIFT_BASKET'], 'ASK')
+        
+        avg_basket_bid, basket_bid,available_buys['GIFT_BASKET'] = self.get_item_price('GIFT_BASKET', available_buys['GIFT_BASKET'], 'BID')
+        
+        avg_choco_ask, choco_ask, available_sells['CHOCOLATE'] = self.get_item_price('CHOCOLATE', available_sells['CHOCOLATE'], 'ASK')
+        avg_choco_bid, choco_bid, available_buys['CHOCOLATE'] = self.get_item_price('CHOCOLATE', available_buys['CHOCOLATE'], 'BID')
+        avg_straw_ask, straw_ask, available_sells['STRAWBERRIES'] = self.get_item_price('STRAWBERRIES', available_sells['STRAWBERRIES'], 'ASK')
+        avg_straw_bid, straw_bid, available_buys['STRAWBERRIES'] = self.get_item_price('STRAWBERRIES', available_buys['STRAWBERRIES'], 'BID')
+        avg_roses_ask, roses_ask, available_sells['ROSES'] = self.get_item_price('ROSES', available_sells['ROSES'], 'ASK')
+        avg_roses_bid, roses_bid, available_buys['ROSES'] = self.get_item_price('ROSES', available_buys['ROSES'], 'BID')
+        
 
-        buy_baskets = best_ask['GIFT_BASKET'] - (best_bid['CHOCOLATE']*4) - (best_bid['STRAWBERRIES']*6) - best_bid['ROSES']
-        sell_baskets = best_bid['GIFT_BASKET'] - (best_ask['CHOCOLATE']*4) - (best_ask['STRAWBERRIES']*6) - best_ask['ROSES']
+        buy_baskets = mid_price['GIFT_BASKET'] - (mid_price['CHOCOLATE']*4) - (mid_price['STRAWBERRIES']*6) - mid_price['ROSES'] - self.basket_mean
+        sell_baskets = mid_price['GIFT_BASKET'] - (mid_price['CHOCOLATE']*4) - (mid_price['STRAWBERRIES']*6) - mid_price['ROSES'] - self.basket_mean
 
+        error_margin = self.basket_std*0.5
+        position = state.position.get('GIFT_BASKET', 0)
+        
+        if buy_baskets > 0:
+          print(" BUY TO OPEN BASKETS " + str(buy_baskets))
+          #if ((avg_basket_ask - (avg_choco_bid*4) - (avg_straw_bid*6) - avg_roses_bid - self.basket_mean) > error_margin) and position < 60:
+          for product in goods:
+              if product == 'GIFT_BASKET':
+                orders['GIFT_BASKET'].append(Order('GIFT_BASKET', mid_price['GIFT_BASKET'], 1))
+                avg_basket_ask, basket_ask, available_sells['GIFT_BASKET'] = self.get_item_price('GIFT_BASKET', available_sells['GIFT_BASKET'], 'ASK')
+                position += 1
+              elif product == 'CHOCOLATE':
+                orders['CHOCOLATE'].append(Order('CHOCOLATE', mid_price['CHOCOLATE'], -4))
+                avg_choco_bid, choco_bid, available_buys['CHOCOLATE'] = self.get_item_price('CHOCOLATE', available_buys['CHOCOLATE'], 'BID')
+              elif product == 'STRAWBERRIES':
+                orders['STRAWBERRIES'].append(Order('STRAWBERRIES', mid_price['STRAWBERRIES'], -6))
+                avg_straw_bid, straw_bid, available_buys['STRAWBERRIES'] = self.get_item_price('STRAWBERRIES', available_buys['STRAWBERRIES'], 'BID')
+              else:
+                orders['ROSES'].append(Order('ROSES', mid_price['ROSES'], -1))
+                avg_roses_bid, roses_bid, available_buys['ROSES'] = self.get_item_price('ROSES', available_buys['ROSES'], 'BID')
+          print(" POS " + str(position))
+        
+        if sell_baskets < 0:
+          print(" SELL TO OPEN BASKETS " + str(sell_baskets))
+          #if ((avg_basket_bid - (avg_choco_ask*4) - (avg_straw_ask*6) - avg_roses_ask - self.basket_mean) < -error_margin) and position > -60:
+          for product in goods:
+              if product == 'GIFT_BASKET':
+                print("BASKET BID OPEN: " + str(avg_basket_bid))
+                orders['GIFT_BASKET'].append(Order('GIFT_BASKET', mid_price['GIFT_BASKET'], -1))
+                avg_basket_bid, basket_bid,available_buys['GIFT_BASKET'] = self.get_item_price('GIFT_BASKET', available_buys['GIFT_BASKET'], 'BID')
+                position -= 1
+              elif product == 'CHOCOLATE':
+                orders['CHOCOLATE'].append(Order('CHOCOLATE', mid_price['CHOCOLATE'], 4))
+                avg_choco_ask, choco_ask, available_sells['CHOCOLATE'] = self.get_item_price('CHOCOLATE', available_sells['CHOCOLATE'], 'ASK')
+              elif product == 'STRAWBERRIES':
+                orders['STRAWBERRIES'].append(Order('STRAWBERRIES', mid_price['STRAWBERRIES'], 6))
+                avg_roses_ask, roses_ask, available_sells['ROSES'] = self.get_item_price('ROSES', available_sells['ROSES'], 'ASK')
+              else:
+                orders['ROSES'].append(Order('ROSES', mid_price['ROSES'], 1))
+                avg_roses_ask, roses_ask, available_sells['ROSES'] = self.get_item_price('ROSES', available_sells['ROSES'], 'ASK')
+          print(" POS " + str(position))
+        '''
+        if buy_baskets <= error_margin and buy_baskets > 0:
+          print(" SELL TO CLOSE BASKETS " + str(buy_baskets))
+          if position > 0:
+            for product in goods:
+              if product == 'GIFT_BASKET':
+                orders['GIFT_BASKET'].append(Order('GIFT_BASKET', mid_price['GIFT_BASKET'], -1))
+                avg_basket_bid, basket_bid,available_buys['GIFT_BASKET'] = self.get_item_price('GIFT_BASKET', available_buys['GIFT_BASKET'], 'BID')
+                position -= 1
+              elif product == 'CHOCOLATE':
+                orders['CHOCOLATE'].append(Order('CHOCOLATE', mid_price['CHOCOLATE'], 4))
+                avg_choco_ask, choco_ask, available_sells['CHOCOLATE'] = self.get_item_price('CHOCOLATE', available_sells['CHOCOLATE'], 'ASK')
+              elif product == 'STRAWBERRIES':
+                orders['STRAWBERRIES'].append(Order('STRAWBERRIES', mid_price['STRAWBERRIES'], 6))
+                avg_roses_ask, roses_ask, available_sells['ROSES'] = self.get_item_price('ROSES', available_sells['ROSES'], 'ASK')
+              else:
+                orders['ROSES'].append(Order('ROSES', mid_price['ROSES'], 1))
+                avg_roses_ask, roses_ask, available_sells['ROSES'] = self.get_item_price('ROSES', available_sells['ROSES'], 'ASK')
+          print(" POS " + str(position))
+        
+        if sell_baskets >= -error_margin and sell_baskets < 0:
+          print(" BUY TO CLOSE BASKETS " + str(sell_baskets))
+          print("BASKET ASK CLOSE: " + str(avg_basket_ask))
+          if position < 0:
+            for product in goods:
+              if product == 'GIFT_BASKET':
+                orders['GIFT_BASKET'].append(Order('GIFT_BASKET', mid_price['GIFT_BASKET'], 1))
+                avg_basket_ask, basket_ask, available_sells['GIFT_BASKET'] = self.get_item_price('GIFT_BASKET', available_sells['GIFT_BASKET'], 'ASK')
+                position += 1
+              elif product == 'CHOCOLATE':
+                orders['CHOCOLATE'].append(Order('CHOCOLATE', mid_price['CHOCOLATE'], -4))
+                avg_choco_bid, choco_bid, available_buys['CHOCOLATE'] = self.get_item_price('CHOCOLATE', available_buys['CHOCOLATE'], 'BID')
+              elif product == 'STRAWBERRIES':
+                orders['STRAWBERRIES'].append(Order('STRAWBERRIES', mid_price['STRAWBERRIES'], -6))
+                avg_straw_bid, straw_bid, available_buys['STRAWBERRIES'] = self.get_item_price('STRAWBERRIES', available_buys['STRAWBERRIES'], 'BID')
+              else:
+                orders['ROSES'].append(Order('ROSES', mid_price['ROSES'], -1))
+                avg_roses_bid, roses_bid, available_buys['ROSES'] = self.get_item_price('ROSES', available_buys['ROSES'], 'BID')
+          print(" POS " + str(position))
+          '''
         return orders
     
     def get_item_price(self, product, order_book, bidorask):
-      etf = {'CHOCOLATE': 4, 'STRAWBERRIES': 6, 'ROSES': 1}
-      orders = {}
+      #print(order_book)
+      etf = {'CHOCOLATE': 4, 'STRAWBERRIES': 6, 'ROSES': 1, 'GIFT_BASKET': 1}
+      avg_price = 0
+      extreme_price = 0
       if bidorask == "BID":
-        for i in range(etf[product]):
-          orders[next(iter(order_book))] = 0
+        while etf[product] > 0:
+          quantity = min(order_book[next(iter(order_book))], etf[product])
+          #print("QUANTITY: " + str(quantity))
+          etf[product] -= quantity
+          #print("AMOUNT REMAINING: " + str(etf[product]))
+          order_book[next(iter(order_book))] -= quantity
+          #print("ORDERBOOK: " + str(order_book[next(iter(order_book))]))
+          if order_book[next(iter(order_book))] == 0:
+            key, val = order_book.popitem(last=False)
+          avg_price += next(iter(order_book)) * quantity
+          if next(iter(order_book)) > extreme_price:
+            extreme_price = next(iter(order_book))
+      else:
+        extreme_price = 100000
+        while -etf[product] < 0:
+          quantity = max(order_book[next(iter(order_book))], -etf[product])
+          #print("QUANTITY: " + str(quantity))
+          etf[product] -= -quantity
+          #print("AMOUNT REMAINING: " + str(etf[product]))
+          order_book[next(iter(order_book))] -= quantity
+          #print("ORDERBOOK: " + str(order_book[next(iter(order_book))]))
+          if order_book[next(iter(order_book))] == 0:
+            key, val = order_book.popitem(last=False)
+          avg_price += next(iter(order_book)) * -quantity
+          if next(iter(order_book)) < extreme_price:
+            extreme_price = next(iter(order_book))
+      etf = {'CHOCOLATE': 4, 'STRAWBERRIES': 6, 'ROSES': 1, 'GIFT_BASKET': 1}
+      #print(order_book)
+      return (avg_price / etf[product]), extreme_price, order_book
+
+
 
     '''
     so basically what we need to do is we need to first decide whether we are gonna buy baksets and sell the

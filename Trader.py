@@ -32,15 +32,17 @@ class Trader:
         
         conversions = 0
         for product in state.order_depths:
-          #if product == "AMETHYSTS":
+          if product == "AMETHYSTS":
             # make sure positions aren't cancelled
-           # result[product] = self.amethysts(state, product)
-          #if product == "STARFRUIT":
-           # result[product] = self.starfruit(state, product, traderObj) 
+            result[product] = self.amethysts(state, product)
+          if product == "STARFRUIT":
+            result[product] = self.starfruit(state, product, traderObj) 
           if product == "ORCHIDS":
             result[product], conversions = self.orchid(state, product)
-          #if product == "GIFT_BASKET":
-            #result[product] = self.gift_basket(state)
+          if product == "GIFT_BASKET":
+            result[product] = self.gift_basket(state)
+          if product == "ROSES":
+            result[product] = self.roses(state, product, traderObj)
 
 		    # String value holding Trader state data required. 
 				# It will be delivered as TradingState.traderData on next execution.
@@ -260,36 +262,11 @@ class Trader:
         order_depth: OrderDepth = state.order_depths[product]
         orders: List[Order] = []
 
-        '''
-        current_position = state.position.get('ORCHIDS', 0)
-        best_bid_local = max(order_depth.buy_orders.keys(), default=0)
-        best_ask_south = state.observations.conversionObservations['ORCHIDS'].askPrice
-        transport_fees = state.observations.conversionObservations['ORCHIDS'].transportFees
-        import_tariff = state.observations.conversionObservations['ORCHIDS'].importTariff
-        best_bid_quantity = order_depth.buy_orders.get(best_bid_local, 0)
-
-        # Calculate the trade volume based on current position, position limits, and available liquidity
-        trade_volume = min(100 - abs(current_position), best_bid_quantity)
-        total_cost_south = (best_ask_south + transport_fees + import_tariff) * trade_volume
-        is_arbitrage = best_bid_local * trade_volume > total_cost_south
-
-        conversions = 0
-
-        if self.orchid_arbitrage:
-            conversions = self.orchid_arbitrage.pop(0)
-
-        if is_arbitrage and trade_volume > 0:
-            # Place a short sell order if there's an arbitrage opportunity
-            orders.append(Order('ORCHIDS', best_bid_local, -trade_volume))
-            # Store the trade volume to keep track of how much we'll need to cover in the next tick
-            self.orchid_arbitrage.append(trade_volume)
-        # If we have pending conversions from previous opportunities, convert them now
-        '''
         conversions = -state.position.get('ORCHIDS', 0)
 
         BUFFER = 2
-        BREAK_EVEN = state.observations.conversionObservations['ORCHIDS'].ask_price + state.observations['ORCHIDS'].import_tariff + BUFFER
-        SELL_PRICE = max(state.observations.conversionObservations['ORCHIDS'].ask_price - 2, BREAK_EVEN)
+        BREAK_EVEN = state.observations.conversionObservations['ORCHIDS'].askPrice + state.observations.conversionObservations['ORCHIDS'].importTariff + BUFFER
+        SELL_PRICE = max(state.observations.conversionObservations['ORCHIDS'].askPrice - 2, BREAK_EVEN)
 
         orders.append(Order('ORCHIDS', int(SELL_PRICE), -100))
 
@@ -361,12 +338,137 @@ class Trader:
 
         return orders
 
+    def roses(self, state, product, traderObj):
+      order_depth: OrderDepth = state.order_depths[product]
+      orders: List[Order] = []
+
+      try:
+        position = state.position[product]
+        MAX_BUY_MOVES = 60-position
+        MAX_SELL_MOVES = -(-60-position)
+      except: # position is 0 because no trades made yet
+        MAX_BUY_MOVES = 60
+        MAX_SELL_MOVES = 60
+      
+      price_sum = 0
+      price_num = 0
+
+
+      #actual price
+      for x in state.order_depths[product].buy_orders:
+        price_sum += abs(x*state.order_depths[product].buy_orders[x])
+        price_num += abs(state.order_depths[product].buy_orders[x])
+      for y in state.order_depths[product].sell_orders:
+        price_sum += abs(-y*state.order_depths[product].sell_orders[y])
+        price_num += abs(state.order_depths[product].sell_orders[y])
+
+      #adds actual price and time to moving array  
+      traderObj.add_vals_roses((float(price_sum)/float(price_num)), state.timestamp)
+
+      acceptable_price = float(price_sum)/float(price_num)
+
+      buy_moves = 0
+      sell_moves = 0
+
+      print(order_depth.sell_orders)
+      print(order_depth.buy_orders)
+
+      size = 2
+      if len(traderObj.rose5) < size:
+        if len(order_depth.sell_orders) != 0:
+            i = 0
+            while(buy_moves <= MAX_BUY_MOVES and i < len(order_depth.sell_orders)):
+              best_ask, best_ask_amount = list((order_depth.sell_orders.items()))[i]
+              # best_ask_amount is negative
+              print(str(best_ask) + "    " + str(acceptable_price))
+              if best_ask < acceptable_price:
+                  print("BUY", str(-best_ask_amount) + "x", best_ask, order_depth.sell_orders)
+                  
+                  buy_moves += -best_ask_amount
+                  orders.append(Order(product, best_ask, min(MAX_BUY_MOVES,-best_ask_amount)))
+              i += 1
+
+        if len(order_depth.buy_orders) != 0:
+            i = 0
+            while(sell_moves <= MAX_SELL_MOVES and i < len(order_depth.buy_orders)):
+              best_bid, best_bid_amount = list((order_depth.buy_orders.items()))[i]
+              # best_bid_amount is postive
+              if best_bid > acceptable_price:
+                  print("SELL", str(best_bid_amount) + "x", best_bid, order_depth.buy_orders)
+                  sell_moves += best_bid_amount
+                  orders.append(Order(product, best_bid, max(-MAX_SELL_MOVES,-best_bid_amount)))
+              i += 1
+      else:
+        predicted_price = int(traderObj.linearRegressionStrawberry())
+
+
+        sells = order_depth.sell_orders.items()
+        buys = order_depth.buy_orders.items()
+
+        sellq = 0
+        sellp = -1
+        maxq = -1
+        for ask, quantity in sells:
+          sellq -= quantity
+          if sellq > maxq:
+            maxq = quantity
+            sellp = ask
+        
+        buyq = 0
+        buyp = -1
+        maxq = -1
+        for ask, quantity in buys:
+          buyq += quantity
+          if buyq > maxq:
+            maxq = quantity
+            buyp = ask
+
+
+        predicted_lower = predicted_price-1
+        predicted_upper = predicted_price+1
+
+        position = state.position.get('CHOCOLATE', 0)
+        current_pos = state.position.get('CHOCOLATE', 0)
+
+
+        for ask, quantity in sells:
+          if (((ask <= predicted_lower) or ((position<0) and 
+                                    (ask == predicted_price))) and current_pos < 60):
+            amount = min(-quantity, 60-current_pos)
+            current_pos += amount
+            orders.append(Order(product, ask, amount))
+
+
+        bid_price = min(buyp + 1, predicted_lower)
+        ask_price = max(sellp - 1, predicted_upper)
+
+        if current_pos < 60:
+            amount = 60 - current_pos
+            orders.append(Order(product, bid_price, amount))
+            current_pos += amount
+        
+        current_pos = position
+        
+        for bid, quantity in buys:
+           if (((bid >= predicted_upper) or ((position>0) and 
+                                  (bid+1 == predicted_upper))) and current_pos > -60):
+              amount = max(-quantity, -60-current_pos)
+              current_pos += amount
+              orders.append(Order(product, bid, amount))
+
+        if current_pos > -60:
+            amount = -60-current_pos
+            orders.append(Order(product, ask_price, amount))
+            current_pos += amount
+
+      return orders
+
 class MovingArray(object):
-    def __init__(self, arr5: list[float], time5: list[float], orchid5: list[float], orchidtime: list[float]):
+    def __init__(self, arr5: list[float], time5: list[float], rose5: list[float], rosetime: list[float]):
       self.arr5 = arr5
-      self.orchid5 = orchid5
+      self.rose5 = rose5
       self.time5 = time5
-      self.orchidtime = orchidtime
+      self.rosetime = rosetime
 
 
     def add_vals(self, price, time):
@@ -379,15 +481,15 @@ class MovingArray(object):
         if len(self.time5) > size:
           self.time5.pop(0)
 
-    def add_vals_orchid(self, price, time):
-        self.orchid5.append(float(price))
-        self.orchidtime.append(float(time))
-        size = 3
-        if len(self.orchid5) > size:
-          self.orchid5.pop(0)
+    def add_vals_roses(self, price, time):
+        self.rose5.append(float(price))
+        self.rosetime.append(float(time))
+        size = 2
+        if len(self.rose5) > size:
+          self.rose5.pop(0)
 
-        if len(self.orchidtime) > size:
-          self.orchidtime.pop(0)
+        if len(self.rosetime) > size:
+          self.rosetime.pop(0)
 
 
     def linearRegression(self):
@@ -413,25 +515,25 @@ class MovingArray(object):
       predictedValue = slope * (self.time5[-1] + 100) + intercept
       return predictedValue
     
-    def linearRegressionOrchid(self):
+    def linearRegressionStrawberry(self):
       #sumX, sumY, sumXY, sumXSquared = 0
-      sumX = sum(self.orchidtime)
-      sumY = sum(self.orchid5)
+      sumX = sum(self.rosetime)
+      sumY = sum(self.rose5)
 
       sumXY = 0
       sumXSquared = 0
-      for i in range(len(self.orchid5)):
-         XY = self.orchid5[i] * self.orchidtime[i]
-         xSquared = self.orchid5[i] ** 2
+      for i in range(len(self.rose5)):
+         XY = self.rose5[i] * self.rosetime[i]
+         xSquared = self.rose5[i] ** 2
          sumXY += XY
          sumXSquared += xSquared
       
-      n = len(self.orchid5)
+      n = len(self.rose5)
 
       slope =  (n * sumXY - sumX*sumY)/(n*sumXSquared - sumX**2)
 
       intercept = (sumY - slope*sumX)/n
 
       #y = m*x + b
-      predictedValue = slope * (self.orchidtime[-1] + 100) + intercept
+      predictedValue = slope * (self.rosetime[-1] + 100) + intercept
       return predictedValue

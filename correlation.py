@@ -30,7 +30,7 @@ for index, row in df.iterrows():
     prices[product].append(mid_price)
 
 for i in range(len(prices['GIFT_BASKET'])):
-    prices['ETF'].append(float(prices['CHOCOLATE'][i]*4 + prices['ROSES'][i] + prices['STRAWBERRIES'][i]*6))
+    prices['ETF'].append(float(prices['STRAWBERRIES'][i]*6))
 
 ETF = prices['ETF']
 GIFT_BASKET = prices['GIFT_BASKET']
@@ -43,9 +43,9 @@ for i in range(len(ETF)):
 print(statistics.mean(ratio))
 print(statistics.stdev(ratio))
 
-#df = pd.DataFrame(ratio)
+df = pd.DataFrame(ratio)
 
-'''
+
 adftest = adfuller(df, autolag='AIC', regression='ct')
 print("ADF Test Results")
 print("Null Hypothesis: The series has a unit root (non-stationary)")
@@ -55,4 +55,3 @@ print("Number of lags:", adftest[2])
 print("Number of observations:", adftest[3])
 print("Critical Values:", adftest[4])
 print("Note: If P-Value is smaller than 0.05, we reject the null hypothesis and the series is stationary")
-'''

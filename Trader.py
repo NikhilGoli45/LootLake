@@ -10,9 +10,13 @@ import numpy as np
 
 class Trader:
 
-
     basket_std = 76
+    #basket_std = 46578
     basket_mean = 380
+    #basket_mean = 537
+    cont_buy_basket_unfill = 0
+    cont_sell_basket_unfill = 0
+    orchid_arbitrage = []
     
     def run(self, state: TradingState):
         #print("traderData: " + state.traderData)
@@ -20,29 +24,27 @@ class Trader:
 
 				# Orders to be placed on exchange matching engine
         result = {}
-        conversions = 0
-        '''
-        for product in state.order_depths:
-          if product == "AMETHYSTS":
-            # make sure positions aren't cancelled
-            result[product] = self.amethysts(state, product)
-          if product == "STARFRUIT":
-            result[product], traderData = self.starfruit(state, product) 
-          if product == "ORCHIDS": 
-            result[product], conversions = self.orchid(state, product)
-        '''
+        try:
+          traderObj = jsonpickle.decode(state.traderData)
+        except:
+          traderObj = MovingArray([], [], [], [])
+
         
-        orders = self.gift_basket(state)
-        result['GIFT_BASKET'] = orders['GIFT_BASKET']
-        result['CHOCOLATE'] = orders['CHOCOLATE']
-        result['STRAWBERRIES'] = orders['STRAWBERRIES']
-        result['ROSES'] = orders['ROSES']
+        conversions = 0
+        for product in state.order_depths:
+          #if product == "AMETHYSTS":
+            # make sure positions aren't cancelled
+           # result[product] = self.amethysts(state, product)
+          #if product == "STARFRUIT":
+           # result[product] = self.starfruit(state, product, traderObj) 
+          if product == "ORCHIDS":
+            result[product], conversions = self.orchid(state, product)
+          #if product == "GIFT_BASKET":
+            #result[product] = self.gift_basket(state)
 
 		    # String value holding Trader state data required. 
 				# It will be delivered as TradingState.traderData on next execution.
-        traderData = "SAMPLE" 
-
-				# Sample conversion request. Check more details below. 
+        traderData = jsonpickle.encode(traderObj) 
         
         # logger.flush(state, result, conversions, traderData)
         return result, conversions, traderData
@@ -53,8 +55,6 @@ class Trader:
 
       sells = sorted(order_depth.sell_orders.items())
       buys = sorted(order_depth.buy_orders.items(), reverse=True)
-      for bid, q in buys:
-        print("PRICE: " + str(bid))
 
       sellq = 0
       sellp = -1
@@ -135,14 +135,9 @@ class Trader:
       return orders
 
     
-    def starfruit(self, state, product):
+    def starfruit(self, state, product, traderObj):
       order_depth: OrderDepth = state.order_depths[product]
       orders: List[Order] = []
-      
-      try:
-        traderObj = jsonpickle.decode(state.traderData)
-      except:
-        traderObj = MovingArray([], [])
 
       try:
         position = state.position[product]
@@ -259,93 +254,52 @@ class Trader:
             orders.append(Order(product, ask_price, amount))
             current_pos += amount
 
-      return orders, jsonpickle.encode(traderObj)
-
+      return orders
+    
     def orchid(self, state, product):
         order_depth: OrderDepth = state.order_depths[product]
         orders: List[Order] = []
 
-        cObservation = state.observations.conversionObservations[product]
-        foreign_bid = cObservation.bidPrice
-        foreign_ask = cObservation.askPrice
-        export = cObservation.exportTariff
-        Import = cObservation.importTariff
-        transport = cObservation.transportFees
+        '''
+        current_position = state.position.get('ORCHIDS', 0)
+        best_bid_local = max(order_depth.buy_orders.keys(), default=0)
+        best_ask_south = state.observations.conversionObservations['ORCHIDS'].askPrice
+        transport_fees = state.observations.conversionObservations['ORCHIDS'].transportFees
+        import_tariff = state.observations.conversionObservations['ORCHIDS'].importTariff
+        best_bid_quantity = order_depth.buy_orders.get(best_bid_local, 0)
 
-        print("FOREIGN MID: " + str((foreign_bid + foreign_ask) / 2))
+        # Calculate the trade volume based on current position, position limits, and available liquidity
+        trade_volume = min(100 - abs(current_position), best_bid_quantity)
+        total_cost_south = (best_ask_south + transport_fees + import_tariff) * trade_volume
+        is_arbitrage = best_bid_local * trade_volume > total_cost_south
 
-        sells = sorted(order_depth.sell_orders.items())
-        buys = sorted(order_depth.buy_orders.items(), reverse=True)
+        conversions = 0
 
-        sellq = 0
-        sellp = -1
-        maxq = -1
-        for ask, quantity in sells:
-          sellq -= quantity
-          if sellq > maxq:
-            maxq = quantity
-            sellp = ask
-            
-        buyq = 0
-        buyp = -1
-        maxq = -1
-        for ask, quantity in buys:
-          buyq += quantity
-          if buyq > maxq:
-            maxq = quantity
-            buyp = ask
+        if self.orchid_arbitrage:
+            conversions = self.orchid_arbitrage.pop(0)
 
-        price_sum = 0
-        price_num = 0
+        if is_arbitrage and trade_volume > 0:
+            # Place a short sell order if there's an arbitrage opportunity
+            orders.append(Order('ORCHIDS', best_bid_local, -trade_volume))
+            # Store the trade volume to keep track of how much we'll need to cover in the next tick
+            self.orchid_arbitrage.append(trade_volume)
+        # If we have pending conversions from previous opportunities, convert them now
+        '''
+        conversions = -state.position.get('ORCHIDS', 0)
 
+        BUFFER = 2
+        BREAK_EVEN = state.observations.conversionObservations['ORCHIDS'].ask_price + state.observations['ORCHIDS'].import_tariff + BUFFER
+        SELL_PRICE = max(state.observations.conversionObservations['ORCHIDS'].ask_price - 2, BREAK_EVEN)
 
-        #actual price
-        for x in state.order_depths[product].buy_orders:
-          price_sum += abs(x*state.order_depths[product].buy_orders[x])
-          price_num += abs(state.order_depths[product].buy_orders[x])
-        for y in state.order_depths[product].sell_orders:
-          price_sum += abs(-y*state.order_depths[product].sell_orders[y])
-          price_num += abs(state.order_depths[product].sell_orders[y])
-        acceptable_price = float(price_sum)/float(price_num)        
+        orders.append(Order('ORCHIDS', int(SELL_PRICE), -100))
 
-
-        position = 0
-        current_pos = position
-
-        foreign_price = (foreign_ask + foreign_bid) / 2
-
-        print("PREDICTION: " + str(foreign_price))
-        print("ACCEPTABLE: " + str(acceptable_price))
-
-        if acceptable_price <= foreign_price: 
-          print("BUY OPPORTUNITY")
-          foreign_price = foreign_price - transport - export
-          print("PREDICTION: " + str(foreign_price))
-          print("ACCEPTABLE: " + str(acceptable_price))
-          max_price = -1
-          for ask, quanity in sells:
-            if ((ask < foreign_price) or ((position < 0) and (ask == foreign_price))) and current_pos < 20:
-              max_price = max(max_price, ask)
-              amount = min(-quanity, 100 - current_pos)
-              current_pos += amount
-              orders.append(Order(product, ask, amount))
-        else:
-          print("SELL OPPORTUNITY")
-          current_pos = position
-          for bid, quantity in buys:
-            if ((bid > foreign_price) or ((position > 0) and (bid == foreign_price))) and current_pos > -20:
-              amount = max(-quantity, -100-current_pos)
-              current_pos += amount
-              orders.append(Order(product, bid, amount))
-
-        print("NUM CONVERSION: " + str(state.position.get(product, 0)))
-        return orders, -state.position.get(product, 0)
-
+        return orders, conversions
+    
     def gift_basket(self, state):
 
         POSITION_LIMIT = {'CHOCOLATE': 250, 'STRAWBERRIES': 350, 'ROSES': 60, 'GIFT_BASKET': 60}
+        orders = []
 
-        orders = {'CHOCOLATE' : [], 'STRAWBERRIES': [], 'ROSES' : [], 'GIFT_BASKET' : []}
         goods = ['CHOCOLATE', 'STRAWBERRIES', 'ROSES', 'GIFT_BASKET']
         available_sells, available_buys, best_ask, best_bid, worst_ask, worst_bid, mid_price, available_buyq, available_sellq = {}, {}, {}, {}, {}, {}, {}, {}, {}
         
@@ -370,157 +324,49 @@ class Trader:
                 if available_sellq[item] >= POSITION_LIMIT[item]/10:
                     break
         
-        avg_basket_ask, basket_ask, available_sells['GIFT_BASKET'] = self.get_item_price('GIFT_BASKET', available_sells['GIFT_BASKET'], 'ASK')
-        
-        avg_basket_bid, basket_bid,available_buys['GIFT_BASKET'] = self.get_item_price('GIFT_BASKET', available_buys['GIFT_BASKET'], 'BID')
-        
-        avg_choco_ask, choco_ask, available_sells['CHOCOLATE'] = self.get_item_price('CHOCOLATE', available_sells['CHOCOLATE'], 'ASK')
-        avg_choco_bid, choco_bid, available_buys['CHOCOLATE'] = self.get_item_price('CHOCOLATE', available_buys['CHOCOLATE'], 'BID')
-        avg_straw_ask, straw_ask, available_sells['STRAWBERRIES'] = self.get_item_price('STRAWBERRIES', available_sells['STRAWBERRIES'], 'ASK')
-        avg_straw_bid, straw_bid, available_buys['STRAWBERRIES'] = self.get_item_price('STRAWBERRIES', available_buys['STRAWBERRIES'], 'BID')
-        avg_roses_ask, roses_ask, available_sells['ROSES'] = self.get_item_price('ROSES', available_sells['ROSES'], 'ASK')
-        avg_roses_bid, roses_bid, available_buys['ROSES'] = self.get_item_price('ROSES', available_buys['ROSES'], 'BID')
-        
 
         buy_baskets = mid_price['GIFT_BASKET'] - (mid_price['CHOCOLATE']*4) - (mid_price['STRAWBERRIES']*6) - mid_price['ROSES'] - self.basket_mean
         sell_baskets = mid_price['GIFT_BASKET'] - (mid_price['CHOCOLATE']*4) - (mid_price['STRAWBERRIES']*6) - mid_price['ROSES'] - self.basket_mean
 
-        error_margin = self.basket_std*0.5
-        position = state.position.get('GIFT_BASKET', 0)
-        
-        if buy_baskets > 0:
-          print(" BUY TO OPEN BASKETS " + str(buy_baskets))
-          #if ((avg_basket_ask - (avg_choco_bid*4) - (avg_straw_bid*6) - avg_roses_bid - self.basket_mean) > error_margin) and position < 60:
-          for product in goods:
-              if product == 'GIFT_BASKET':
-                orders['GIFT_BASKET'].append(Order('GIFT_BASKET', mid_price['GIFT_BASKET'], 1))
-                avg_basket_ask, basket_ask, available_sells['GIFT_BASKET'] = self.get_item_price('GIFT_BASKET', available_sells['GIFT_BASKET'], 'ASK')
-                position += 1
-              elif product == 'CHOCOLATE':
-                orders['CHOCOLATE'].append(Order('CHOCOLATE', mid_price['CHOCOLATE'], -4))
-                avg_choco_bid, choco_bid, available_buys['CHOCOLATE'] = self.get_item_price('CHOCOLATE', available_buys['CHOCOLATE'], 'BID')
-              elif product == 'STRAWBERRIES':
-                orders['STRAWBERRIES'].append(Order('STRAWBERRIES', mid_price['STRAWBERRIES'], -6))
-                avg_straw_bid, straw_bid, available_buys['STRAWBERRIES'] = self.get_item_price('STRAWBERRIES', available_buys['STRAWBERRIES'], 'BID')
-              else:
-                orders['ROSES'].append(Order('ROSES', mid_price['ROSES'], -1))
-                avg_roses_bid, roses_bid, available_buys['ROSES'] = self.get_item_price('ROSES', available_buys['ROSES'], 'BID')
-          print(" POS " + str(position))
-        
-        if sell_baskets < 0:
-          print(" SELL TO OPEN BASKETS " + str(sell_baskets))
-          #if ((avg_basket_bid - (avg_choco_ask*4) - (avg_straw_ask*6) - avg_roses_ask - self.basket_mean) < -error_margin) and position > -60:
-          for product in goods:
-              if product == 'GIFT_BASKET':
-                print("BASKET BID OPEN: " + str(avg_basket_bid))
-                orders['GIFT_BASKET'].append(Order('GIFT_BASKET', mid_price['GIFT_BASKET'], -1))
-                avg_basket_bid, basket_bid,available_buys['GIFT_BASKET'] = self.get_item_price('GIFT_BASKET', available_buys['GIFT_BASKET'], 'BID')
-                position -= 1
-              elif product == 'CHOCOLATE':
-                orders['CHOCOLATE'].append(Order('CHOCOLATE', mid_price['CHOCOLATE'], 4))
-                avg_choco_ask, choco_ask, available_sells['CHOCOLATE'] = self.get_item_price('CHOCOLATE', available_sells['CHOCOLATE'], 'ASK')
-              elif product == 'STRAWBERRIES':
-                orders['STRAWBERRIES'].append(Order('STRAWBERRIES', mid_price['STRAWBERRIES'], 6))
-                avg_roses_ask, roses_ask, available_sells['ROSES'] = self.get_item_price('ROSES', available_sells['ROSES'], 'ASK')
-              else:
-                orders['ROSES'].append(Order('ROSES', mid_price['ROSES'], 1))
-                avg_roses_ask, roses_ask, available_sells['ROSES'] = self.get_item_price('ROSES', available_sells['ROSES'], 'ASK')
-          print(" POS " + str(position))
-        '''
-        if buy_baskets <= error_margin and buy_baskets > 0:
-          print(" SELL TO CLOSE BASKETS " + str(buy_baskets))
-          if position > 0:
-            for product in goods:
-              if product == 'GIFT_BASKET':
-                orders['GIFT_BASKET'].append(Order('GIFT_BASKET', mid_price['GIFT_BASKET'], -1))
-                avg_basket_bid, basket_bid,available_buys['GIFT_BASKET'] = self.get_item_price('GIFT_BASKET', available_buys['GIFT_BASKET'], 'BID')
-                position -= 1
-              elif product == 'CHOCOLATE':
-                orders['CHOCOLATE'].append(Order('CHOCOLATE', mid_price['CHOCOLATE'], 4))
-                avg_choco_ask, choco_ask, available_sells['CHOCOLATE'] = self.get_item_price('CHOCOLATE', available_sells['CHOCOLATE'], 'ASK')
-              elif product == 'STRAWBERRIES':
-                orders['STRAWBERRIES'].append(Order('STRAWBERRIES', mid_price['STRAWBERRIES'], 6))
-                avg_roses_ask, roses_ask, available_sells['ROSES'] = self.get_item_price('ROSES', available_sells['ROSES'], 'ASK')
-              else:
-                orders['ROSES'].append(Order('ROSES', mid_price['ROSES'], 1))
-                avg_roses_ask, roses_ask, available_sells['ROSES'] = self.get_item_price('ROSES', available_sells['ROSES'], 'ASK')
-          print(" POS " + str(position))
-        
-        if sell_baskets >= -error_margin and sell_baskets < 0:
-          print(" BUY TO CLOSE BASKETS " + str(sell_baskets))
-          print("BASKET ASK CLOSE: " + str(avg_basket_ask))
-          if position < 0:
-            for product in goods:
-              if product == 'GIFT_BASKET':
-                orders['GIFT_BASKET'].append(Order('GIFT_BASKET', mid_price['GIFT_BASKET'], 1))
-                avg_basket_ask, basket_ask, available_sells['GIFT_BASKET'] = self.get_item_price('GIFT_BASKET', available_sells['GIFT_BASKET'], 'ASK')
-                position += 1
-              elif product == 'CHOCOLATE':
-                orders['CHOCOLATE'].append(Order('CHOCOLATE', mid_price['CHOCOLATE'], -4))
-                avg_choco_bid, choco_bid, available_buys['CHOCOLATE'] = self.get_item_price('CHOCOLATE', available_buys['CHOCOLATE'], 'BID')
-              elif product == 'STRAWBERRIES':
-                orders['STRAWBERRIES'].append(Order('STRAWBERRIES', mid_price['STRAWBERRIES'], -6))
-                avg_straw_bid, straw_bid, available_buys['STRAWBERRIES'] = self.get_item_price('STRAWBERRIES', available_buys['STRAWBERRIES'], 'BID')
-              else:
-                orders['ROSES'].append(Order('ROSES', mid_price['ROSES'], -1))
-                avg_roses_bid, roses_bid, available_buys['ROSES'] = self.get_item_price('ROSES', available_buys['ROSES'], 'BID')
-          print(" POS " + str(position))
-          '''
+        trade_at = self.basket_std*0.5
+
+        if state.position.get('GIFT_BASKET', 0) == 60:
+            self.cont_buy_basket_unfill = 0
+        if state.position.get('GIFT_BASKET', 0) == -60:
+            self.cont_sell_basket_unfill = 0
+
+        pb_pos = state.position.get('GIFT_BASKET', 0)
+        pb_neg = state.position.get('GIFT_BASKET', 0)
+
+        if sell_baskets > trade_at:
+            vol = state.position.get('GIFT_BASKET', 0) + 60
+            self.cont_buy_basket_unfill = 0 # no need to buy rn
+            assert(vol >= 0)
+            if vol > 0:
+                do_bask = 1
+                basket_sell_sig = 1
+                orders.append(Order('GIFT_BASKET', worst_bid['GIFT_BASKET'], -vol)) 
+                self.cont_sell_basket_unfill += 2
+                pb_neg -= vol
+        elif buy_baskets < -trade_at:
+            vol = 60 - state.position.get('GIFT_BASKET', 0)
+            self.cont_sell_basket_unfill = 0 # no need to sell rn
+            assert(vol >= 0)
+            if vol > 0:
+                do_bask = 1
+                basket_buy_sig = 1
+                orders.append(Order('GIFT_BASKET', worst_ask['GIFT_BASKET'], vol))
+                self.cont_buy_basket_unfill += 2
+                pb_pos += vol
+
         return orders
-    
-    def get_item_price(self, product, order_book, bidorask):
-      #print(order_book)
-      etf = {'CHOCOLATE': 4, 'STRAWBERRIES': 6, 'ROSES': 1, 'GIFT_BASKET': 1}
-      avg_price = 0
-      extreme_price = 0
-      if bidorask == "BID":
-        while etf[product] > 0:
-          quantity = min(order_book[next(iter(order_book))], etf[product])
-          #print("QUANTITY: " + str(quantity))
-          etf[product] -= quantity
-          #print("AMOUNT REMAINING: " + str(etf[product]))
-          order_book[next(iter(order_book))] -= quantity
-          #print("ORDERBOOK: " + str(order_book[next(iter(order_book))]))
-          if order_book[next(iter(order_book))] == 0:
-            key, val = order_book.popitem(last=False)
-          avg_price += next(iter(order_book)) * quantity
-          if next(iter(order_book)) > extreme_price:
-            extreme_price = next(iter(order_book))
-      else:
-        extreme_price = 100000
-        while -etf[product] < 0:
-          quantity = max(order_book[next(iter(order_book))], -etf[product])
-          #print("QUANTITY: " + str(quantity))
-          etf[product] -= -quantity
-          #print("AMOUNT REMAINING: " + str(etf[product]))
-          order_book[next(iter(order_book))] -= quantity
-          #print("ORDERBOOK: " + str(order_book[next(iter(order_book))]))
-          if order_book[next(iter(order_book))] == 0:
-            key, val = order_book.popitem(last=False)
-          avg_price += next(iter(order_book)) * -quantity
-          if next(iter(order_book)) < extreme_price:
-            extreme_price = next(iter(order_book))
-      etf = {'CHOCOLATE': 4, 'STRAWBERRIES': 6, 'ROSES': 1, 'GIFT_BASKET': 1}
-      #print(order_book)
-      return (avg_price / etf[product]), extreme_price, order_book
-
-
-
-    '''
-    so basically what we need to do is we need to first decide whether we are gonna buy baksets and sell the
-    individual items or the opposite. In order to do this we need to get the average price of the next __ items based
-    on how many of them are in the basket, and then substract that from teh total gift basket price.
-    Then we need to place orders at the exact prices of the ___ items that we are buying or selling, which isn't hard,
-    but it hard to think about how to do it best.
-    '''
-
-
-
 
 class MovingArray(object):
-    def __init__(self, arr5: list[float], time5: list[float]):
+    def __init__(self, arr5: list[float], time5: list[float], orchid5: list[float], orchidtime: list[float]):
       self.arr5 = arr5
+      self.orchid5 = orchid5
       self.time5 = time5
+      self.orchidtime = orchidtime
 
 
     def add_vals(self, price, time):
@@ -532,6 +378,17 @@ class MovingArray(object):
 
         if len(self.time5) > size:
           self.time5.pop(0)
+
+    def add_vals_orchid(self, price, time):
+        self.orchid5.append(float(price))
+        self.orchidtime.append(float(time))
+        size = 3
+        if len(self.orchid5) > size:
+          self.orchid5.pop(0)
+
+        if len(self.orchidtime) > size:
+          self.orchidtime.pop(0)
+
 
     def linearRegression(self):
       #sumX, sumY, sumXY, sumXSquared = 0
@@ -554,4 +411,27 @@ class MovingArray(object):
 
       #y = m*x + b
       predictedValue = slope * (self.time5[-1] + 100) + intercept
+      return predictedValue
+    
+    def linearRegressionOrchid(self):
+      #sumX, sumY, sumXY, sumXSquared = 0
+      sumX = sum(self.orchidtime)
+      sumY = sum(self.orchid5)
+
+      sumXY = 0
+      sumXSquared = 0
+      for i in range(len(self.orchid5)):
+         XY = self.orchid5[i] * self.orchidtime[i]
+         xSquared = self.orchid5[i] ** 2
+         sumXY += XY
+         sumXSquared += xSquared
+      
+      n = len(self.orchid5)
+
+      slope =  (n * sumXY - sumX*sumY)/(n*sumXSquared - sumX**2)
+
+      intercept = (sumY - slope*sumX)/n
+
+      #y = m*x + b
+      predictedValue = slope * (self.orchidtime[-1] + 100) + intercept
       return predictedValue

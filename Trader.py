@@ -16,6 +16,8 @@ class Trader:
     #basket_mean = 537
     cont_buy_basket_unfill = 0
     cont_sell_basket_unfill = 0
+    cont_buy_roses_unfill = 0
+    cont_sell_roses_unfill = 0
     orchid_arbitrage = []
     
     def run(self, state: TradingState):

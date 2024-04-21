@@ -31,7 +31,7 @@ class Trader:
         except:
           traderObj = MovingArray([], [], [], [])
 
-        
+        print(traderObj.arr5)
         conversions = 0
         for product in state.order_depths:
           if product == "AMETHYSTS":
@@ -43,8 +43,8 @@ class Trader:
             result[product], conversions = self.orchid(state, product)
           if product == "GIFT_BASKET":
             result[product] = self.gift_basket(state)
-          if product == "ROSES":
-            result[product] = self.roses(state, product, traderObj)
+          #if product == "ROSES":
+           # result[product] = self.roses(state, product, traderObj)
 
 		    # String value holding Trader state data required. 
 				# It will be delivered as TradingState.traderData on next execution.

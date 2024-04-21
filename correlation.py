@@ -5,46 +5,59 @@ from statsmodels.graphics.tsaplots import plot_acf
 from statsmodels.tsa.stattools import adfuller
 import statistics
 
-df = pd.read_csv('round-3-island-data-bottle/prices_round_3_day_0.csv', delimiter=';')
+closing = []
+
+df = pd.read_csv('round-4-island-data-bottle/prices_round_4_day_1.csv', delimiter=';')
 df = df[['product', 'mid_price']]
 
-prices = {'CHOCOLATE': [], 'STRAWBERRIES': [], 'ROSES': [], 'GIFT_BASKET': [], 'ETF': []}
+prices = {'COCONUT': [], 'COCONUT_COUPON': [], 'SPREAD': []}
 
 for index, row in df.iterrows():
     product = row['product']
     mid_price = row['mid_price']
     prices[product].append(mid_price)
 
-df = pd.read_csv('round-3-island-data-bottle/prices_round_3_day_1.csv', delimiter=';')
+closing.append(prices['COCONUT_COUPON'][-1])
+
+df = pd.read_csv('round-4-island-data-bottle/prices_round_4_day_2.csv', delimiter=';')
 df = df[['product', 'mid_price']]
 for index, row in df.iterrows():
     product = row['product']
     mid_price = row['mid_price']
     prices[product].append(mid_price)
 
-df = pd.read_csv('round-3-island-data-bottle/prices_round_3_day_2.csv', delimiter=';')
+closing.append(prices['COCONUT_COUPON'][-1])
+
+df = pd.read_csv('round-4-island-data-bottle/prices_round_4_day_3.csv', delimiter=';')
 df = df[['product', 'mid_price']]
 for index, row in df.iterrows():
     product = row['product']
     mid_price = row['mid_price']
     prices[product].append(mid_price)
 
-for i in range(len(prices['GIFT_BASKET'])):
-    prices['ETF'].append(float(prices['STRAWBERRIES'][i]*6))
+closing.append(prices['COCONUT_COUPON'][-1])
 
-ETF = prices['ETF']
-GIFT_BASKET = prices['GIFT_BASKET']
+daily_returns = [(closing[i] - closing[i-1]) / closing[i-1] for i in range(1, len(closing))]
 
-ratio = []
-for i in range(len(ETF)):
-   ratio.append(GIFT_BASKET[i] - ETF[i]) # i tried spread and ratio, but spread gave a slightly lower p-value so 
-                                        # that means that there is a more stationary mean that we can trade around
+# Calculate standard deviation of returns
+std_dev = np.std(daily_returns, ddof=1)
 
-print(statistics.mean(ratio))
-print(statistics.stdev(ratio))
+# Annualize standard deviation
+annualized_volatility = std_dev * np.sqrt(252)  # Assuming 252 trading days in a year
 
-df = pd.DataFrame(ratio)
+print(f"Annualized Volatility (3-day data): {annualized_volatility:.4f}")
 
+for i in range(len(prices['COCONUT'])):
+    prices['SPREAD'].append(float(prices['COCONUT'][i]) / float(prices['COCONUT_COUPON'][i]))
+
+spread = prices['COCONUT_COUPON']
+
+print(statistics.mean(spread))
+print(statistics.stdev(spread))
+
+df = pd.DataFrame(spread)
+df.plot()
+#plt.show()
 
 adftest = adfuller(df, autolag='AIC', regression='ct')
 print("ADF Test Results")

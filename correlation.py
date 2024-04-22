@@ -37,7 +37,9 @@ for index, row in df.iterrows():
 
 closing.append(prices['COCONUT_COUPON'][-1])
 
-daily_returns = [(closing[i] - closing[i-1]) / closing[i-1] for i in range(1, len(closing))]
+daily_returns = []
+for i in range(1, len(prices['COCONUT'])):
+    daily_returns.append(np.log(prices['COCONUT'][i] / prices['COCONUT'][i-1]))
 
 # Calculate standard deviation of returns
 std_dev = np.std(daily_returns, ddof=1)

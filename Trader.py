@@ -493,18 +493,6 @@ class Trader:
       
       available_sells = order_depth.sell_orders.items()
       available_buys = order_depth.buy_orders.items()
-      
-      #actual price
-      price_sum = 0
-      price_num = 0
-      for bid, quantity in available_buys:
-        price_sum += abs(bid*quantity)
-        price_num += abs(quantity)
-      for ask, quantity in available_sells:
-        price_sum += abs(-ask*quantity)
-        price_num += abs(-quantity)
-
-      mid_price = float(price_sum) / float(price_num)
 
       STRIKE = 10000
       PREMIUM = 637
@@ -520,13 +508,13 @@ class Trader:
       cup_buy = 600 - cup_pos
       cup_sell = -600 - cup_pos
 
-      coco_mid = mid_price
+      coco_mid = self.get_mid(state, 'COCONUT')
       intrinsic = coco_mid - STRIKE
       DELTA = 0.50
       option_value = DELTA * intrinsic + PREMIUM
 
       max_bid = max(order_depth.buy_orders.keys(), default=0)
-      buy_vol = order_depth. buy_orders.get(max_bid, 0)
+      buy_vol = order_depth.buy_orders.get(max_bid, 0)
 
       min_ask = min(order_depth.sell_orders.keys(), default=0)
       sell_vol = order_depth.sell_orders.get(min_ask, 0)
@@ -560,6 +548,12 @@ class Trader:
           coc_order.append(Order (COC, max_coc, -coc_pos))
 
       return coc_order, cup_order
+
+    def get_mid(self, state, product):
+      bids = OrderedDict(sorted(state.order_depths[product].buy_orders.items()))
+      asks = OrderedDict(sorted(state.order_depths[product].sell_orders.items(), reverse=True))
+
+      return (next(iter(bids)) + next(iter(asks))) / 2
 
 
     def norm_cdf(self, x):

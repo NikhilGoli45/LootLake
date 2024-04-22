@@ -48,7 +48,7 @@ annualized_volatility = std_dev * np.sqrt(252)  # Assuming 252 trading days in a
 print(f"Annualized Volatility (3-day data): {annualized_volatility:.4f}")
 
 for i in range(len(prices['COCONUT'])):
-    prices['SPREAD'].append(float(prices['COCONUT'][i]) / float(prices['COCONUT_COUPON'][i]))
+    prices['SPREAD'].append(float(prices['COCONUT_COUPON'][i]))
 
 spread = prices['COCONUT_COUPON']
 

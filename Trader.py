@@ -5,20 +5,17 @@ import string
 import jsonpickle
 import statistics
 import numpy as np
+import math
 
 
 
 class Trader:
 
     basket_std = 76
-    #basket_std = 46578
+    coconut_std = 1
     basket_mean = 380
-    #basket_mean = 537
-    cont_buy_basket_unfill = 0
-    cont_sell_basket_unfill = 0
-    cont_buy_roses_unfill = 0
-    cont_sell_roses_unfill = 0
-    orchid_arbitrage = []
+    coconut_mean = 15.9
+
     
     def run(self, state: TradingState):
         #print("traderData: " + state.traderData)
@@ -37,15 +34,15 @@ class Trader:
           if product == "AMETHYSTS":
             # make sure positions aren't cancelled
             result[product] = self.amethysts(state, product)
-          if product == "STARFRUIT":
+          elif product == "STARFRUIT":
             result[product] = self.starfruit(state, product, traderObj) 
-          if product == "ORCHIDS":
+          elif product == "ORCHIDS":
             result[product], conversions = self.orchid(state, product)
-          if product == "GIFT_BASKET":
+          elif product == "GIFT_BASKET":
             result[product] = self.gift_basket(state)
-          #if product == "ROSES":
-           # result[product] = self.roses(state, product, traderObj)
-
+          elif product == "COCONUT_COUPON":
+            result['COCONUT'], result['COCONUT_COUPON'] = self.coupon(state)
+          
 		    # String value holding Trader state data required. 
 				# It will be delivered as TradingState.traderData on next execution.
         traderData = jsonpickle.encode(traderObj) 
@@ -309,34 +306,15 @@ class Trader:
 
         trade_at = self.basket_std*0.5
 
-        if state.position.get('GIFT_BASKET', 0) == 60:
-            self.cont_buy_basket_unfill = 0
-        if state.position.get('GIFT_BASKET', 0) == -60:
-            self.cont_sell_basket_unfill = 0
-
-        pb_pos = state.position.get('GIFT_BASKET', 0)
-        pb_neg = state.position.get('GIFT_BASKET', 0)
 
         if sell_baskets > trade_at:
             vol = state.position.get('GIFT_BASKET', 0) + 60
-            self.cont_buy_basket_unfill = 0 # no need to buy rn
-            assert(vol >= 0)
             if vol > 0:
-                do_bask = 1
-                basket_sell_sig = 1
                 orders.append(Order('GIFT_BASKET', worst_bid['GIFT_BASKET'], -vol)) 
-                self.cont_sell_basket_unfill += 2
-                pb_neg -= vol
         elif buy_baskets < -trade_at:
             vol = 60 - state.position.get('GIFT_BASKET', 0)
-            self.cont_sell_basket_unfill = 0 # no need to sell rn
-            assert(vol >= 0)
             if vol > 0:
-                do_bask = 1
-                basket_buy_sig = 1
                 orders.append(Order('GIFT_BASKET', worst_ask['GIFT_BASKET'], vol))
-                self.cont_buy_basket_unfill += 2
-                pb_pos += vol
 
         return orders
 
@@ -464,6 +442,130 @@ class Trader:
             current_pos += amount
 
       return orders
+
+    
+    def coconut(self, state):
+      orders = {'COCONUT': [], 'COCONUT_COUPON': []}
+      POSITION_LIMIT = {'COCONUT': 300, 'COCONUT_COUPON': 600}
+
+      goods = ['COCONUT', 'COCONUT_COUPON']
+      available_sells, available_buys, best_ask, best_bid, worst_ask, worst_bid, mid_price, available_buyq, available_sellq = {}, {}, {}, {}, {}, {}, {}, {}, {}
+        
+      for item in goods:
+          available_sells[item] = OrderedDict(sorted(state.order_depths[item].sell_orders.items()))
+          available_buys[item] = OrderedDict(sorted(state.order_depths[item].buy_orders.items(), reverse=True))
+
+          best_ask[item] = next(iter(available_sells[item]))
+          best_bid[item] = next(iter(available_buys[item]))
+
+          worst_ask[item] = next(reversed(available_sells[item]))
+          worst_bid[item] = next(reversed(available_buys[item]))
+
+          mid_price[item] = (best_ask[item] + best_bid[item])//2
+          available_buyq[item], available_sellq[item] = 0, 0
+          for price, quantity in available_buys[item].items():
+              available_buyq[item] += quantity 
+              if available_buyq[item] >= POSITION_LIMIT[item]/10:
+                  break
+          for price, quantity in available_sells[item].items():
+              available_sellq[item] += -quantity 
+              if available_sellq[item] >= POSITION_LIMIT[item]/10:
+                  break
+
+      buy_coupons = (mid_price['COCONUT'] / mid_price['COCONUT_COUPON']) - self.coconut_mean
+
+      trade_at = self.coconut_std*0.5
+
+      if buy_coupons > trade_at:
+        vol = state.position.get('COCONUT', 0) + 300
+        if vol > 0:
+          orders['COCONUT'].append(Order('COCONUT', worst_bid['COCONUT'], -vol)) 
+      elif buy_coupons:
+        vol = 300 - state.position.get('COCONUT', 0)
+        if vol > 0:
+          orders['COCONUT'].append(Order('COCONUT', worst_ask['COCONUT'], vol))
+      return orders
+    
+    def coupon(self, state):
+      
+      order_depth: OrderDepth = state.order_depths['COCONUT']
+
+      
+      available_sells = order_depth.sell_orders.items()
+      available_buys = order_depth.buy_orders.items()
+      
+      #actual price
+      price_sum = 0
+      price_num = 0
+      for bid, quantity in available_buys:
+        price_sum += abs(bid*quantity)
+        price_num += abs(quantity)
+      for ask, quantity in available_sells:
+        price_sum += abs(-ask*quantity)
+        price_num += abs(-quantity)
+
+      mid_price = float(price_sum) / float(price_num)
+
+      STRIKE = 10000
+      PREMIUM = 637
+
+      COC = "COCONUT"
+      CUP = "COCONUT_COUPON"
+
+      order_depth = state.order_depths[CUP]
+      coc_pos = state.position.get (COC, 0)
+      cup_pos = state.position.get(CUP, 0)
+      print(f"coc: {coc_pos}, cup: {cup_pos}")
+
+      cup_buy = 600 - cup_pos
+      cup_sell = -600 - cup_pos
+
+      coco_mid = mid_price
+      intrinsic = coco_mid - STRIKE
+      DELTA = 0.50
+      option_value = DELTA * intrinsic + PREMIUM
+
+      max_bid = max(order_depth.buy_orders.keys(), default=0)
+      buy_vol = order_depth. buy_orders.get(max_bid, 0)
+
+      min_ask = min(order_depth.sell_orders.keys(), default=0)
+      sell_vol = order_depth.sell_orders.get(min_ask, 0)
+
+      mid = (max_bid + min_ask) / 2
+
+      max_coc = max(state.order_depths[COC].buy_orders.keys())
+      min_coc = min( state.order_depths[COC].sell_orders.keys())
+
+      coc_order = []
+      cup_order = []
+
+      STD = 12.75
+      TRADE = 1 * STD
+      CLOSE = 0.3 * STD
+
+      if max_bid > option_value + TRADE:
+        buy_vol = max(-buy_vol, cup_sell)
+        cup_order.append(Order(CUP, max_bid, buy_vol))
+        coc_order.append(Order(COC, min_coc, -buy_vol // 2))
+      elif min_ask + TRADE < option_value:
+        sell_vol = min(-sell_vol, cup_buy)
+        cup_order.append (Order(CUP, min_ask, sell_vol)) 
+        coc_order.append(Order(COC, max_coc, -sell_vol // 2))
+      elif option_value + CLOSE > mid and mid > option_value - CLOSE:
+        if cup_pos > 0:
+          cup_order.append(Order (CUP, max_bid, -cup_pos)) 
+          coc_order.append(Order(COC, min_coc, -coc_pos))
+        else:
+          cup_order.append(Order (CUP, min_ask, -cup_pos)) 
+          coc_order.append(Order (COC, max_coc, -coc_pos))
+
+      return coc_order, cup_order
+
+
+    def norm_cdf(self, x):
+      return (1.0 + math.erf(x / math.sqrt(2.0))) / 2.0
+
+
 
 class MovingArray(object):
     def __init__(self, arr5: list[float], time5: list[float], rose5: list[float], rosetime: list[float]):
